@@ -1,0 +1,258 @@
+import asyncio
+from concurrent.futures import process
+import datetime as dt
+import logging
+
+import flet as ft
+from anyio import Path
+
+from app_logic import MainUi
+from app_logic.processing.docx_creation import Processing
+from app_logic.ui import open_file
+from ui.templates import (
+    DateRow,
+    Overlay,
+    StyledAlertDialog,
+    StyledButton,
+    StyledTextField,
+)
+
+
+class TabEditDocument(MainUi):
+    def __init__(self, page: ft.Page, tab_label: ft.Text) -> None:
+        self.tab_label = tab_label
+        self.doc_processing = Processing()
+        self.page = page
+
+        self.textfield_subject = StyledTextField(
+            label="Предмет", max_length=180, on_change=self.on_change_validate
+        )
+        self.textfield_spec = StyledTextField(
+            label="Специальность", max_length=180, on_change=self.on_change_validate
+        )
+        self.textfield_cmk = StyledTextField(
+            label="Председатель ЦМK", max_length=180, on_change=self.on_change_validate
+        )
+        self.textfield_tutor = StyledTextField(
+            label="Преподаватель", max_length=180, on_change=self.on_change_validate
+        )
+
+        self.checkbox_qualifying = ft.Checkbox(label="Квалификационные билеты")
+        self.checkbox_rnd_simple_questions = ft.Checkbox(
+            label="Рандомизировать теоретические вопросы"
+        )
+        self.checkbox_rnd_hard_questions = ft.Checkbox(
+            label="Рандомизировать практические вопросы"
+        )
+        self.button_clear = StyledButton(text="Очистить поля")
+
+        year = dt.date.today().year
+        self.date_picker = ft.DatePicker(
+            first_date=dt.date(year - 20, 1, 1),
+            last_date=dt.date(year + 2, 12, 31),
+            on_change=self.on_change_date_picker,
+        )
+        page.overlay.append(self.date_picker)
+
+        self.date_row = DateRow(
+            page=page,
+            date_picker=self.date_picker,
+            on_change=self.on_change_date_row,
+        )
+
+        overlay = Overlay(text_value="Сохрани документ...")
+        filepicker = ft.FilePicker(on_result=lambda e: self.on_pick(e, overlay))
+        page.overlay.extend([overlay, filepicker])
+
+        self.button_submit = StyledButton(
+            text="Создать билет(ы)",
+            disabled=True,
+            on_click=lambda e: self.on_click_button_submit(e, filepicker, overlay),
+        )
+
+    # TODO: IMPLEMENT DATEPICKER CHANGE DATE ON DATEROW UPDATE
+    def on_change_date_row(self, e):
+        pass
+
+    def on_change_date_picker(self, e):
+        date = e.control.value
+        formatted = f"{date.year}.{date.strftime('%B')}.{date.day}".split(".")
+        self.date_row.value = formatted
+        self.page.update()
+
+    def _textfield_clear(self, e):
+        for field in (
+            self.textfield_cmk,
+            self.textfield_spec,
+            self.textfield_subject,
+            self.textfield_tutor,
+        ):
+            field.value = ""
+        self.page.update()
+
+    def on_click_button_submit(
+        self, e, filepicker: ft.FilePicker, overlay: ft.Container
+    ):
+        overlay.visible = True
+        self.page.update()
+
+        space = ""
+        if self.textfield_spec.value:
+            space = " по "
+
+        filepicker.save_file(
+            dialog_title="Сохранить файл",
+            allowed_extensions=["docx"],
+            file_name=f"Билеты промежуточной аттестации{space}{self.textfield_spec.value}.docx",
+        )
+
+    def on_change_validate(self, e):
+        self.validate(
+            e,
+            self.page,
+            self.button_submit,
+            self.textfield_subject,
+            self.textfield_spec,
+            self.textfield_cmk,
+            self.textfield_tutor,
+        )
+
+    def on_pick(self, e: ft.FilePickerResultEvent, overlay: ft.Container):
+        if not e.path:
+            overlay.visible = False
+            self.page.update()
+            logging.info(f"Save path is None: {e.path}")
+            return
+
+        filepath: str = e.path
+        if filepath[-5:].lower() != ".docx":
+            filepath = f"{filepath}.docx"
+
+        text = ft.Text(
+            "Документ создается...",
+            size=32,
+            color="white",
+            weight=ft.FontWeight.BOLD,
+            text_align=ft.TextAlign.CENTER,
+        )
+        loading_ui = ft.Column(
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+        loading_ui.controls = [text, ft.ProgressRing()]
+
+        def thread():
+            overlay.content = loading_ui
+            overlay.visible = True
+            self.page.update()
+
+            self.doc_processing.generate_document(
+                save_to=filepath,
+                subject=(self.textfield_subject.value or ""),
+                spec=(self.textfield_spec.value or ""),
+                cmk=(self.textfield_cmk.value or ""),
+                tutor=(self.textfield_tutor.value or ""),
+                date=(self.date_row.value),
+                qualify_status=self.checkbox_qualifying.value,
+                random_simple_question=self.checkbox_rnd_simple_questions.value,
+                random_hard_question=self.checkbox_rnd_hard_questions.value,
+            )
+            self.handle_generation_complete(filepath, overlay)
+
+            overlay.content = Overlay().content
+
+        self.page.run_thread(thread)
+
+    def handle_generation_complete(self, filepath: str, overlay: ft.Container):
+        # Hide the overlay after generation completes
+        overlay.visible = False
+        self.page.update()
+
+        # Create and show the completion dialog
+        dialog = StyledAlertDialog(
+            title=ft.Text("Документ создан", text_align=ft.TextAlign.CENTER),
+            alignment=ft.Alignment(0, 0),
+        )
+        dialog.actions = [
+            ft.ResponsiveRow(
+                [
+                    StyledButton(
+                        text="Открыть файл",
+                        expand=True,
+                        on_click=lambda e: open_file(filepath),
+                    ),
+                    StyledButton(
+                        text="Открыть папку",
+                        on_click=lambda e: open_file(str(Path(filepath).parent)),
+                    ),
+                    StyledButton(
+                        text="Закрыть",
+                        expand=True,
+                        on_click=lambda _: self.page.close(dialog),
+                    ),
+                ]
+            )
+        ]
+        self.page.open(dialog)
+
+    def get_tab_ui(self) -> ft.Tab:
+        self.button_clear.on_click = self._textfield_clear
+
+        container_checkbox = ft.Container(margin=ft.margin.only(top=5, bottom=0))
+        container_checkbox.content = ft.ResponsiveRow(
+            spacing=0,
+            run_spacing=0,
+            controls=[
+                self.checkbox_qualifying,
+                self.checkbox_rnd_simple_questions,
+                self.checkbox_rnd_hard_questions,
+            ],
+        )
+
+        textfields_responsive_row = ft.ResponsiveRow(
+            alignment=ft.MainAxisAlignment.CENTER
+        )
+        textfields_responsive_row.controls = [
+            ft.Column(
+                col={"sm": 6},
+                controls=[self.textfield_cmk, self.date_row],
+            ),
+            ft.Column(
+                col={"sm": 6},
+                controls=[self.textfield_subject, self.textfield_spec],
+            ),
+            self.textfield_tutor,
+        ]
+
+        tab_listview = ft.ListView(expand=True)
+        tab_listview.controls = [
+            textfields_responsive_row,
+            container_checkbox,
+        ]
+
+        tab_buttons = ft.Container(
+            margin=ft.margin.only(left=9, top=0, right=9, bottom=9)
+        )
+        tab_buttons.content = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            expand=True,
+            controls=[
+                self.button_submit,
+                self.button_clear,
+            ],
+        )
+
+        tab = ft.Tab()
+        tab.tab_content = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(name=ft.Icons.EDIT_DOCUMENT, tooltip=self.tab_label.value),
+                self.tab_label,
+            ],
+        )
+        tab.content = ft.Column(
+            expand=True,
+            spacing=0,
+            controls=[ft.Container(tab_listview, expand=1, padding=10), tab_buttons],
+        )
+        return tab
