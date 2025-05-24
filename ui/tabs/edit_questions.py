@@ -327,7 +327,7 @@ class EditQuestionsTabController:
         alert_dialog = StyledAlertDialog(
             modal=True,
             content=alert_dialog_content,
-            actions=[button_save, button_close],
+            actions=[ft.Row([button_save, button_close])],
         )
 
         # INFO: МОЖНО ОПТИМИЗИРОВАТЬ

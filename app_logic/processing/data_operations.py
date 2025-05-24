@@ -47,8 +47,11 @@ class SqliteData:
     def add_list(self, rows: list[str], question_type: QuestionType):
         validated = []
         for question in rows:
-            if not isinstance(question, str) or len(question.strip()) == 0:
+            if not isinstance(question, str):
                 raise ValueError(f"Invalid question: {question}")
+            elif len(question.strip()) == 0:
+                raise ValueError("Empty line")
+
             validated.append((question.strip(), question_type.value))
 
         sql = "INSERT INTO questions(question, question_type) VALUES(?,?)"
@@ -114,8 +117,6 @@ class TextProcessing:
 
 def docx_extract_questions(docx_path: str) -> list[str]:
     """Return all numbered text from .docx"""
-    questions = []
-
     REGEX_NUMBER_WITH_BRACKET_LINE: Final[str] = r"\s*\d+\).*"  # example: 1)Lorem
     REGEX_NUMBER_WITH_BRACKET: Final[str] = r"\s*\d+\)"  # example: 1)
 
@@ -123,15 +124,11 @@ def docx_extract_questions(docx_path: str) -> list[str]:
         document_text_list = re.sub(r"\t", "", (docx_content.text).replace("\t", ""))
         questions_raw = re.findall(REGEX_NUMBER_WITH_BRACKET_LINE, document_text_list)
 
-        for i in questions_raw:
-            question_cleaned = re.sub(REGEX_NUMBER_WITH_BRACKET, "", i)
-            questions.append(question_cleaned)
+        def clean_question(q: str) -> str:
+            return re.sub(REGEX_NUMBER_WITH_BRACKET, "", q.strip()).strip()
+
+        questions = [
+            cleaned for q in questions_raw if (cleaned := clean_question(q)) != ""
+        ]
 
     return questions
-
-
-if __name__ == "__main__":
-    sql = SqliteData()
-    # sql.add_list(["one", "two", "three"], QuestionsType.PRACTICAL)
-    print(sql.read_questions_dict(QuestionType.PRACTICAL))
-    input()
