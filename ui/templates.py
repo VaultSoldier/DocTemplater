@@ -1,10 +1,11 @@
-from typing import Callable, Iterable, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Set, Tuple, Union
 import flet as ft
 from flet import Blur, Control, InputFilter, OptionalNumber
 import datetime as dt
 import locale
 import calendar
 from flet.core.buttons import OutlinedBorder
+from flet.core.segmented_button import Segment
 from flet.core.types import (
     BorderRadiusValue,
     ColorValue,
@@ -189,6 +190,29 @@ class DateRow(ft.Container):
         self.page.update()
 
 
+class StyledSegmentedButton(ft.SegmentedButton):
+    def __init__(
+        self,
+        segments: List[Segment] = [],
+        selected: Optional[Set] = None,
+        show_selected_icon: Optional[bool] = False,
+        expand: Union[None, bool, int] = True,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            segments=segments,
+            selected=selected,
+            show_selected_icon=show_selected_icon,
+            expand=expand,
+            *args,
+            **kwargs,
+        )
+
+        self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(6))
+        # selected_icon=ft.Icon(ft.Icons.CHECK_BOX_OUTLINED)
+
+
 class StyledButton(ft.Button):
     def __init__(
         self,
@@ -202,15 +226,18 @@ class StyledButton(ft.Button):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            text,
+            icon,
+            on_click=on_click,
+            disabled=disabled,
+            height=height,
+            width=width,
+            expand=expand,
+            *args,
+            **kwargs,
+        )
 
-        self.text = text
-        self.icon = icon
-        self.on_click = on_click
-        self.disabled = disabled
-        self.height = height
-        self.width = width
-        self.expand = expand
         self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=6))
 
 
@@ -229,17 +256,19 @@ class StyledTextField(ft.TextField):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-
-        self.label = label
-        self.hint_text = hint_text
-        self.input_filter = input_filter
-        self.border_color = border_color
-        self.border_radius = border_radius
-        self.max_length = max_length
-        self.expand = expand
-        self.suffix_icon = suffix_icon
-        self.on_change = on_change
+        super().__init__(
+            label=label,
+            hint_text=hint_text,
+            input_filter=input_filter,
+            border_color=border_color,
+            border_radius=border_radius,
+            max_length=max_length,
+            expand=expand,
+            suffix_icon=suffix_icon,
+            on_change=on_change,
+            *args,
+            **kwargs,
+        )
 
 
 class WarnPopup(ft.SnackBar):
@@ -276,7 +305,6 @@ class WarnPopup(ft.SnackBar):
 class StyledAlertDialog(ft.AlertDialog):
     def __init__(
         self,
-        # custom values
         shape: Optional[OutlinedBorder] = ft.RoundedRectangleBorder(radius=9),
         content_padding=ft.padding.only(left=14, right=14, top=14, bottom=0),
         actions_padding=ft.padding.only(left=14, right=14, top=4, bottom=14),
@@ -285,10 +313,12 @@ class StyledAlertDialog(ft.AlertDialog):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-
-        self.content_padding = content_padding
-        self.actions_padding = actions_padding
-        self.actions_alignment = actions_alignment
-        self.shape = shape
-        self.action_button_padding = action_button_padding
+        super().__init__(
+            shape=shape,
+            content_padding=content_padding,
+            actions_padding=actions_padding,
+            action_button_padding=action_button_padding,
+            actions_alignment=actions_alignment,
+            *args,
+            **kwargs,
+        )

@@ -16,6 +16,7 @@ from ui.templates import (
     Overlay,
     StyledAlertDialog,
     StyledButton,
+    StyledSegmentedButton,
     StyledTextField,
     WarnPopup,
 )
@@ -401,14 +402,21 @@ class EditQuestionsTabController:
                     break
             self.page.update()
 
-        radio_group = ft.RadioGroup(ft.Text(), value="questions_practical")
-        radio_group.content = ft.Row(
-            expand=True,
-            controls=[
-                ft.Radio(value="questions_practical", label="Практические"),
-                ft.Radio(value="questions_theoretical", label="Теоретические"),
-            ],
-        )
+        segments_qtype = StyledSegmentedButton(selected={QuestionType.PRACTICAL.value})
+        segments_qtype.segments = [
+            ft.Segment(
+                expand=True,
+                value=QuestionType.PRACTICAL.value,
+                label=ft.Text("Практические"),
+                # icon=ft.Icon(ft.Icons.CHECK_BOX_OUTLINE_BLANK),
+            ),
+            ft.Segment(
+                expand=True,
+                value=QuestionType.THEORETICAL.value,
+                label=ft.Text("Теоретические"),
+                # icon=ft.Icon(ft.Icons.CHECK_BOX_OUTLINE_BLANK),
+            ),
+        ]
 
         # INFO: МОЖНО ОПТИМИЗИРОВАТЬ СОХРАНЕНИЕ ДАННЫХ
         def on_click_save(e):
@@ -417,15 +425,19 @@ class EditQuestionsTabController:
                 for textfield_data, _ in textfields
                 if textfield_data.value.strip()
             ]
-            if not values:
+            if not values or not segments_qtype.selected:
                 return
 
-            if radio_group.value == "questions_practical":
+            qtype = next(iter(segments_qtype.selected))
+
+            if qtype == QuestionType.PRACTICAL.value:
                 question_type = QuestionType.PRACTICAL
                 questions = self.questions_practical
-            else:
+            elif qtype == QuestionType.THEORETICAL.value:
                 question_type = QuestionType.THEORETICAL
                 questions = self.questions_theoretical
+            else:
+                return
 
             self.sqlite.add_list(values, question_type)
             questions.clear()
@@ -435,13 +447,13 @@ class EditQuestionsTabController:
             logging.info(f"Сохранённые значения: {values}")
             self.page.close(alert_layout)
 
-        button_add_row = StyledButton(text="Добавить", on_click=add_textfield)
+        button_add_row = StyledButton(text="Добавить поле", on_click=add_textfield)
         button_save = StyledButton(text="Сохранить", on_click=on_click_save)
         button_close = StyledButton(text="Закрыть")
 
         column_selections = ft.Column()
         column_selections.controls = [
-            radio_group,
+            ft.Row(expand=True, controls=[segments_qtype]),
             ft.Row(
                 controls=[button_add_row, button_save, button_close],
                 alignment=ft.MainAxisAlignment.CENTER,
