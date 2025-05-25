@@ -105,12 +105,20 @@ class SqliteData:
 
 
 class TextProcessing:
-    def get_dict(self, filepath: str) -> list[str]:
+    def get_dict(self, filepath: str) -> list[str] | None:
+        REGEX = r"^\s*\d+[.)]{1,2}\s*"  # пример: 1) или 1. или 1.)
+
         with open(filepath, "r", encoding="utf-8") as file:
-            result: list[str] = []
-            for line in file:
-                result.append(line.strip())
-            return result
+            values = [
+                cleaned
+                for q in file
+                if (cleaned := clean_question_by_regex(REGEX, q)) != ""
+            ]
+
+            if not any(values):
+                return
+
+            return values
 
 
 def clean_question_by_regex(regex, question: str) -> str:

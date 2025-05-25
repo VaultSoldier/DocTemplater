@@ -60,7 +60,7 @@ class DateRow(ft.Container):
         if (page.height or 0) > 575:
             self.menu_height = (page.height or 0) * 0.45
         else:
-            pass
+            self.menu_height = None
 
         super().__init__()
         self.border = ft.border.all(1)
@@ -70,13 +70,13 @@ class DateRow(ft.Container):
         self.on_change = on_change or (lambda x: None)
         self.padding = 0
 
-        self._years(self.menu_height)
-        self._months(self.menu_height)
+        self._years()
+        self._months()
 
         today = dt.date.today()
         init_year = today.year
         init_month = today.month
-        self._days(self.menu_height, init_year, init_month)
+        self._days(init_year, init_month)
 
         self.content = ft.Row(
             controls=[
@@ -120,7 +120,7 @@ class DateRow(ft.Container):
             ),
         )
 
-    def _years(self, menu_height) -> None:
+    def _years(self) -> None:
         year = dt.date.today().year
         years = list(map(str, range(year + 2, year - 21, -1)))
         self._dropdown(
@@ -128,19 +128,19 @@ class DateRow(ft.Container):
             elements=years,
             on_change=self._on_change,
             hint_text="Год",
-            menu_height=menu_height,
+            menu_height=self.menu_height,
         )
 
-    def _months(self, menu_height) -> None:
+    def _months(self) -> None:
         self._dropdown(
             name="months",
             elements=self.months_,
             on_change=self._on_change,
             hint_text="Месяц",
-            menu_height=menu_height,
+            menu_height=self.menu_height,
         )
 
-    def _days(self, menu_height, year: int, month: int) -> None:
+    def _days(self, year: int, month: int) -> None:
         num_days = calendar.monthrange(year, month)[1]
         days = list(map(str, range(1, num_days + 1)))
         self._dropdown(
@@ -148,7 +148,7 @@ class DateRow(ft.Container):
             elements=days,
             on_change=self._on_change_wrapper,
             hint_text="День",
-            menu_height=menu_height,
+            menu_height=self.menu_height,
         )
 
     def _dropdown(self, name: str, elements: Iterable, **kwargs) -> None:
@@ -158,9 +158,8 @@ class DateRow(ft.Container):
         """
         self.date_controls_dict[name] = ft.Dropdown(
             options=[ft.dropdown.Option(x) for x in elements],
-            expand_loose=False,
-            filled=True,
             expand=True,
+            dense=True,
             **kwargs,
         )
 

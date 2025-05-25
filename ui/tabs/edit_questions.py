@@ -131,11 +131,15 @@ class EditQuestionsTabController:
         logging.info(filepath)
 
         if filepath[-5:].lower() == ".docx":
-            filetype = "docx"
+            new_questions = docx_extract_questions(filepath)
         elif filepath[-4:].lower() == ".txt":
-            filetype = "txt"
+            new_questions = self.text_processing.get_dict(filepath)
         else:
             warning()
+            return
+
+        if not new_questions:
+            self.page.open(WarnPopup("В файле нету вопросов"))
             return
 
         # TODO: Доработать ПОПАП
@@ -143,12 +147,10 @@ class EditQuestionsTabController:
         button_theoretical = StyledButton("Теоретические")
 
         button_practical.on_click = (
-            lambda e, qtype=QuestionType.PRACTICAL: on_click_save_to(e, qtype, filetype)
+            lambda e, qtype=QuestionType.PRACTICAL: on_click_save_to(e, qtype)
         )
         button_theoretical.on_click = (
-            lambda e, qtype=QuestionType.THEORETICAL: on_click_save_to(
-                e, qtype, filetype
-            )
+            lambda e, qtype=QuestionType.THEORETICAL: on_click_save_to(e, qtype)
         )
 
         dialog_content = ft.Row(expand=True)
@@ -163,18 +165,11 @@ class EditQuestionsTabController:
         )
         self.page.open(dialog)
 
-        def on_click_save_to(e, qtype, filetype):
+        def on_click_save_to(e, qtype):
             button_practical.disabled = True
             button_theoretical.disabled = True
             button_practical.update()
             button_theoretical.update()
-
-            if filetype == "docx":
-                new_questions = docx_extract_questions(filepath)
-            elif filetype == "txt":
-                new_questions = self.text_processing.get_dict(filepath)
-            else:
-                raise ValueError("Неправильный тип данных")
 
             self.sqlite.add_list(new_questions, qtype)
             self.refresh_table(self.sqlite.read_questions_dict(qtype), qtype)
