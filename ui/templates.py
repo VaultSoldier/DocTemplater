@@ -1,4 +1,5 @@
 from typing import Callable, Iterable, List, Optional, Set, Tuple, Union
+from babel.dates import format_date
 import flet as ft
 from flet import Blur, Control, InputFilter, OptionalNumber
 import datetime as dt
@@ -48,10 +49,11 @@ class Overlay(ft.Container):
 
 # NOTE: DatePicker write on_change to date_controls_dict
 class DateRow(ft.Container):
-    locale.setlocale(category=locale.LC_TIME, locale="ru_RU.UTF-8")
-
     date_controls_dict = dict()
-    months_ = list(calendar.month_name)[1:]
+    months_ = [
+        format_date(dt.date(2025, i, 1), "MMMM", locale="ru")
+        for i in range(1, 13)  # "MMMM" = тип падежа
+    ]
     dt_format = "%Y,%B,%d,%H,%M"
 
     def __init__(

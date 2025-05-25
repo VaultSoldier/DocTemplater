@@ -1,5 +1,3 @@
-import asyncio
-from concurrent.futures import process
 import datetime as dt
 import logging
 
@@ -164,35 +162,31 @@ class TabEditDocument(MainUi):
         self.page.run_thread(thread)
 
     def handle_generation_complete(self, filepath: str, overlay: ft.Container):
-        # Hide the overlay after generation completes
         overlay.visible = False
         self.page.update()
 
-        # Create and show the completion dialog
         dialog = StyledAlertDialog(
             title=ft.Text("Документ создан", text_align=ft.TextAlign.CENTER),
             alignment=ft.Alignment(0, 0),
         )
-        dialog.actions = [
-            ft.ResponsiveRow(
-                [
-                    StyledButton(
-                        text="Открыть файл",
-                        expand=True,
-                        on_click=lambda e: open_file(filepath),
-                    ),
-                    StyledButton(
-                        text="Открыть папку",
-                        on_click=lambda e: open_file(str(Path(filepath).parent)),
-                    ),
-                    StyledButton(
-                        text="Закрыть",
-                        expand=True,
-                        on_click=lambda _: self.page.close(dialog),
-                    ),
-                ]
-            )
+        responsive_row = ft.ResponsiveRow()
+        responsive_row.controls = [
+            StyledButton(
+                text="Открыть файл",
+                expand=True,
+                on_click=lambda e: open_file(filepath),
+            ),
+            StyledButton(
+                text="Открыть папку",
+                on_click=lambda e: open_file(str(Path(filepath).parent)),
+            ),
+            StyledButton(
+                text="Закрыть",
+                expand=True,
+                on_click=lambda _: self.page.close(dialog),
+            ),
         ]
+        dialog.actions = [responsive_row]
         self.page.open(dialog)
 
     def get_tab_ui(self) -> ft.Tab:

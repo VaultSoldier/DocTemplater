@@ -5,11 +5,15 @@ import sys
 from typing import Any, Final
 
 from docx2python import docx2python
+from platformdirs import user_data_dir
 
 from app_logic.types import OrderType, QuestionType
 
+APP_NAME: Final[str] = "DocTemplater"
+APP_AUTHOR: Final[str] = "SSK"
 
-def get_resource_path(relative_path: str) -> str:
+
+def get_resource_path_temp(relative_path: str) -> str:
     """
     Возвращает корректный путь к файлу:
     - во время разработки: os.path.abspath(relative_path)
@@ -23,7 +27,10 @@ def get_resource_path(relative_path: str) -> str:
 
 class SqliteData:
     def __init__(self) -> None:
-        self.filepath = get_resource_path("assets/data.db")
+        data_dir = user_data_dir(APP_NAME, APP_AUTHOR)
+        os.makedirs(data_dir, exist_ok=True)
+
+        self.filepath = os.path.join(data_dir, "data.db")
         self.con = sqlite3.connect(database=self.filepath, autocommit=True)
         self.cur = self.con.cursor()
 

@@ -8,14 +8,16 @@ from docx.enum.text import WD_BREAK
 from docxtpl import DocxTemplate, RichText
 from docx import Document
 from docxcompose.composer import Composer
-from app_logic.processing.data_operations import SqliteData, get_resource_path
+from app_logic.processing.data_operations import SqliteData, get_resource_path_temp
 from app_logic.types import QuestionType
 
 
 # INFO: МОЖНО ОПТИМИЗИРОВАТЬ ПЕРЕДАВАЯ ВОПРОСЫ, А НЕ ЗАГРУЖАТЬ ИХ
 class Processing:
     def __init__(self) -> None:
-        self.PATH_BASE_DOC: Final[str] = get_resource_path("assets/templates/base.docx")
+        self.PATH_BASE_DOC: Final[str] = get_resource_path_temp(
+            "assets/templates/base.docx"
+        )
         self.sql = SqliteData()
 
         self.practical_questions: list[str] = []

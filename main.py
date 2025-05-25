@@ -11,7 +11,6 @@ logging.basicConfig(
     format="%(asctime)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
 
 class DocTemplater(MainUi):
