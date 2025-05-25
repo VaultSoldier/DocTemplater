@@ -141,7 +141,6 @@ class DateRow(ft.Container):
         )
 
     def _days(self, menu_height, year: int, month: int) -> None:
-        print(year, month)
         num_days = calendar.monthrange(year, month)[1]
         days = list(map(str, range(1, num_days + 1)))
         self._dropdown(
@@ -172,13 +171,18 @@ class DateRow(ft.Container):
         self.on_change(self.value)
         year = int(self.date_controls_dict["years"].value)
         month = self.months_.index(self.date_controls_dict["months"].value) + 1
-
-        num_days = calendar.monthrange(year, month)[1]
-        opts = [ft.dropdown.Option(str(d)) for d in range(1, num_days + 1)]
+        max_day = calendar.monthrange(year, month)[1]
         days_dd = self.date_controls_dict["days"]
-        days_dd.options = opts
-        days_dd.value = None
-        days_dd.update()
+        days_dd.options = [ft.dropdown.Option(str(d)) for d in range(1, max_day + 1)]
+        prev = days_dd.value
+
+        try:
+            prev_int = int(prev) if prev is not None else max_day
+        except ValueError:
+            prev_int = max_day
+        days_dd.value = str(min(prev_int, max_day))
+
+        self.page.update()
 
     @property
     def value(self) -> list:
@@ -187,9 +191,7 @@ class DateRow(ft.Container):
     @value.setter
     def value(self, values: list | dict):
         if isinstance(values, list):
-            year_val = values[0]
-            month_val = values[1]
-            day_val = values[2] if len(values) > 2 else None
+            year_val, month_val, day_val = values
         else:
             year_val = values.get("years")
             month_val = values.get("months")
@@ -221,18 +223,16 @@ class DateRow(ft.Container):
         opts = [ft.dropdown.Option(str(d)) for d in range(1, num_days + 1)]
         days_dd.options = opts
 
-        if day_val is not None:
-            try:
-                day_int = int(day_val)
-                if 1 <= day_int <= num_days:
-                    days_dd.value = str(day_int)
-                else:
-                    days_dd.value = None
-            except ValueError:
-                days_dd.value = None
-        else:
+        if day_val is None:
             days_dd.value = None
+            self.page.update()
+            return
 
+        try:
+            day_int = int(day_val)
+            days_dd.value = str(day_int) if 1 <= day_int <= num_days else None
+        except ValueError:
+            days_dd.value = None
         self.page.update()
 
 
