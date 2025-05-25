@@ -61,7 +61,6 @@ class DateRow(ft.Container):
             self.menu_height = (page.height or 0) * 0.45
         else:
             pass
-        self.dropdown_width = (page.width or 0) * 0.16
 
         super().__init__()
         self.border = ft.border.all(1)
@@ -71,8 +70,13 @@ class DateRow(ft.Container):
         self.on_change = on_change or (lambda x: None)
         self.padding = 0
 
-        for attr in ["_years", "_months", "_days"]:
-            getattr(self, attr)(self.menu_height)
+        self._years(self.menu_height)
+        self._months(self.menu_height)
+
+        today = dt.date.today()
+        init_year = today.year
+        init_month = today.month
+        self._days(self.menu_height, init_year, init_month)
 
         self.content = ft.Row(
             controls=[
@@ -91,9 +95,14 @@ class DateRow(ft.Container):
             expand=True,
         )
 
+        self.value = {
+            "years": str(init_year),
+            "months": self.months_[init_month - 1],
+            "days": str(today.day),
+        }
+
     def on_resize_change_height(self, height: float):
         height = height * 0.45
-
         for dd in self.date_controls_dict.values():
             dd.menu_height = height
             dd.update()
@@ -131,11 +140,10 @@ class DateRow(ft.Container):
             menu_height=menu_height,
         )
 
-    def _days(
-        self, menu_height, year: int = dt.date.today().year, month: int = 1
-    ) -> None:
-        day = calendar.monthrange(year, month)[1]
-        days = range(1, day + 1)
+    def _days(self, menu_height, year: int, month: int) -> None:
+        print(year, month)
+        num_days = calendar.monthrange(year, month)[1]
+        days = list(map(str, range(1, num_days + 1)))
         self._dropdown(
             name="days",
             elements=days,
@@ -162,18 +170,15 @@ class DateRow(ft.Container):
 
     def _on_change(self, e) -> None:
         self.on_change(self.value)
-        year = self.date_controls_dict["years"].value
-        month = self.date_controls_dict["months"].value
+        year = int(self.date_controls_dict["years"].value)
+        month = self.months_.index(self.date_controls_dict["months"].value) + 1
 
-        if year and month:
-            year = int(year)
-            month = self.months_.index(month) + 1
-            days = range(1, calendar.monthrange(year, month)[1] + 1)
-
-            self.date_controls_dict["days"].options = [
-                ft.dropdown.Option(str(d)) for d in days
-            ]
-            self.page.update()
+        num_days = calendar.monthrange(year, month)[1]
+        opts = [ft.dropdown.Option(str(d)) for d in range(1, num_days + 1)]
+        days_dd = self.date_controls_dict["days"]
+        days_dd.options = opts
+        days_dd.value = None
+        days_dd.update()
 
     @property
     def value(self) -> list:
@@ -182,11 +187,52 @@ class DateRow(ft.Container):
     @value.setter
     def value(self, values: list | dict):
         if isinstance(values, list):
-            for control, val in zip(self.date_controls_dict.values(), values):
-                control.value = val
-        elif isinstance(values, dict):
-            for key, val in values.items():
-                self.date_controls_dict[key].value = val
+            year_val = values[0]
+            month_val = values[1]
+            day_val = values[2] if len(values) > 2 else None
+        else:
+            year_val = values.get("years")
+            month_val = values.get("months")
+            day_val = values.get("days")
+
+        years_dd = self.date_controls_dict["years"]
+        months_dd = self.date_controls_dict["months"]
+        days_dd = self.date_controls_dict["days"]
+
+        years_dd.value = year_val
+        months_dd.value = month_val
+
+        if not year_val or not month_val:
+            days_dd.options = []
+            days_dd.value = None
+            self.page.update()
+            return
+
+        try:
+            year = int(year_val)
+            month = self.months_.index(month_val) + 1
+        except ValueError:
+            days_dd.options = []
+            days_dd.value = None
+            self.page.update()
+            return
+
+        num_days = calendar.monthrange(year, month)[1]
+        opts = [ft.dropdown.Option(str(d)) for d in range(1, num_days + 1)]
+        days_dd.options = opts
+
+        if day_val is not None:
+            try:
+                day_int = int(day_val)
+                if 1 <= day_int <= num_days:
+                    days_dd.value = str(day_int)
+                else:
+                    days_dd.value = None
+            except ValueError:
+                days_dd.value = None
+        else:
+            days_dd.value = None
+
         self.page.update()
 
 

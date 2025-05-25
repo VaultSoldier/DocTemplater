@@ -37,9 +37,7 @@ class SqliteData:
 
     def add_line(self, line: str, question_type: QuestionType):
         if not isinstance(line, str) or len(line.strip()) == 0:
-            raise ValueError("Неправильный формат вопроса")
-        elif not isinstance(question_type, QuestionType):
-            raise TypeError("question_type должен быть экземпляром QuestionType")
+            raise ValueError(f"Wrong type: {type(line)}")
 
         sql = "INSERT INTO questions(question, question_type) VALUES(?,?)"
         self.cur.execute(sql, (line.strip(), question_type.value))
@@ -115,6 +113,10 @@ class TextProcessing:
             return result
 
 
+def clean_question_by_regex(regex, question: str) -> str:
+    return re.sub(regex, "", question.strip()).strip()
+
+
 def docx_extract_questions(docx_path: str) -> list[str]:
     """Return all numbered text from .docx"""
     REGEX_NUMBER_WITH_BRACKET_LINE: Final[str] = r"\s*\d+\).*"  # example: 1)Lorem
@@ -124,11 +126,10 @@ def docx_extract_questions(docx_path: str) -> list[str]:
         document_text_list = re.sub(r"\t", "", (docx_content.text).replace("\t", ""))
         questions_raw = re.findall(REGEX_NUMBER_WITH_BRACKET_LINE, document_text_list)
 
-        def clean_question(q: str) -> str:
-            return re.sub(REGEX_NUMBER_WITH_BRACKET, "", q.strip()).strip()
-
         questions = [
-            cleaned for q in questions_raw if (cleaned := clean_question(q)) != ""
+            cleaned
+            for q in questions_raw
+            if (cleaned := clean_question_by_regex(REGEX_NUMBER_WITH_BRACKET, q)) != ""
         ]
 
     return questions
