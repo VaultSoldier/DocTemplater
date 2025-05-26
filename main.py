@@ -1,4 +1,3 @@
-import locale
 import flet as ft
 import logging
 from ui.tabs.edit_documents import TabEditDocument

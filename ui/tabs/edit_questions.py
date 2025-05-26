@@ -564,7 +564,6 @@ class TabEditQuestions(EditQuestionsTabController):
         overlay = Overlay()
         filepicker = ft.FilePicker(on_result=lambda e: self.on_pick(e, overlay))
         self.page.overlay.extend([overlay, filepicker])
-
         self.button_upload_docx = StyledButton(
             text=".DOCX или .TXT",
             icon=ft.Icons.FILE_UPLOAD,

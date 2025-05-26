@@ -12,6 +12,7 @@ from ui.templates import (
     Overlay,
     StyledAlertDialog,
     StyledButton,
+    StyledSegmentedButton,
     StyledTextField,
 )
 
@@ -31,8 +32,18 @@ class TabEditDocument(MainUi):
         self.textfield_cmk = StyledTextField(
             label="Председатель ЦМK", max_length=180, on_change=self.on_change_validate
         )
+        self.textfield_number_question_number = StyledTextField(
+            label="Количество билетов",
+            on_change=self.on_change_validate,
+            max_length=3,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            input_filter=ft.NumbersOnlyInputFilter(),
+            # border=ft.InputBorder.UNDERLINE,
+            expand=True,
+            dense=True,
+        )
         self.textfield_tutor = StyledTextField(
-            label="Преподаватель", max_length=180, on_change=self.on_change_validate
+            label="Преподаватель", on_change=self.on_change_validate, expand=True
         )
 
         self.checkbox_qualifying = ft.Checkbox(label="Квалификационные билеты")
@@ -192,8 +203,54 @@ class TabEditDocument(MainUi):
     def get_tab_ui(self) -> ft.Tab:
         self.button_clear.on_click = self._textfield_clear
 
-        container_checkbox = ft.Container(margin=ft.margin.only(top=5, bottom=0))
-        container_checkbox.content = ft.ResponsiveRow(
+        def on_segmented_change(e: ft.ControlEvent):
+            if e.control.selected != {"Manual"}:
+                self.textfield_number_question_number.disabled = True
+                self.textfield_number_question_number.update()
+                return
+
+            self.textfield_number_question_number.disabled = False
+            self.textfield_number_question_number.update()
+
+        segmented_button_questions = StyledSegmentedButton(
+            selected={"Manual"}, on_change=on_segmented_change, expand=True
+        )
+        segmented_button_questions.segments = [
+            ft.Segment(
+                value="Manual",
+                label=ft.Text("Ввод"),
+                expand=True,
+            ),
+            ft.Segment(
+                value="Practical", label=ft.Text("Из практических"), expand=True
+            ),
+            ft.Segment(
+                value="Theoretical", label=ft.Text("Их теоретических"), expand=True
+            ),
+        ]
+
+        number_of_questions = ft.Container()
+        number_of_questions.content = ft.Column(
+            controls=[
+                ft.Row(
+                    [
+                        ft.Text(
+                            "Выбор количества билетов",
+                            weight=ft.FontWeight.BOLD,
+                            text_align=ft.TextAlign.CENTER,
+                            size=20,
+                        )
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Divider(),
+                ft.Row(controls=[segmented_button_questions]),
+                self.textfield_number_question_number,
+            ]
+        )
+
+        checkboxes_rnd = ft.Container()
+        checkboxes_rnd.content = ft.ResponsiveRow(
             spacing=0,
             run_spacing=0,
             controls=[
@@ -204,7 +261,7 @@ class TabEditDocument(MainUi):
         )
 
         textfields_responsive_row = ft.ResponsiveRow(
-            alignment=ft.MainAxisAlignment.CENTER
+            expand=True, alignment=ft.MainAxisAlignment.CENTER
         )
         textfields_responsive_row.controls = [
             ft.Column(
@@ -218,10 +275,11 @@ class TabEditDocument(MainUi):
             self.textfield_tutor,
         ]
 
-        tab_listview = ft.ListView(expand=True)
+        tab_listview = ft.ListView(expand=True, spacing=10)
         tab_listview.controls = [
             textfields_responsive_row,
-            container_checkbox,
+            number_of_questions,
+            checkboxes_rnd,
         ]
 
         tab_buttons = ft.Container(
