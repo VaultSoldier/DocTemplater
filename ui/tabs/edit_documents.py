@@ -6,6 +6,7 @@ from anyio import Path
 
 from app_logic import MainUi
 from app_logic.processing.docx_creation import Processing
+from app_logic.types import QuestionType
 from app_logic.ui import open_file
 from ui.templates import (
     DateRow,
@@ -32,7 +33,7 @@ class TabEditDocument(MainUi):
         self.textfield_cmk = StyledTextField(
             label="Председатель ЦМK", max_length=180, on_change=self.on_change_validate
         )
-        self.textfield_number_question_number = StyledTextField(
+        self.textfield_cards_number = StyledTextField(
             label="Количество билетов",
             on_change=self.on_change_validate,
             max_length=3,
@@ -205,12 +206,12 @@ class TabEditDocument(MainUi):
 
         def on_segmented_change(e: ft.ControlEvent):
             if e.control.selected != {"Manual"}:
-                self.textfield_number_question_number.disabled = True
-                self.textfield_number_question_number.update()
+                self.textfield_cards_number.disabled = True
+                self.textfield_cards_number.update()
                 return
 
-            self.textfield_number_question_number.disabled = False
-            self.textfield_number_question_number.update()
+            self.textfield_cards_number.disabled = False
+            self.textfield_cards_number.update()
 
         segmented_button_questions = StyledSegmentedButton(
             selected={"Manual"}, on_change=on_segmented_change, expand=True
@@ -225,73 +226,141 @@ class TabEditDocument(MainUi):
                 value="Practical", label=ft.Text("Из практических"), expand=True
             ),
             ft.Segment(
-                value="Theoretical", label=ft.Text("Их теоретических"), expand=True
+                value="Theoretical", label=ft.Text("Из теоретических"), expand=True
             ),
         ]
+
+        def card_questions_num(label: str) -> ft.Card:
+            return ft.Card(
+                content=ft.Container(
+                    padding=20,
+                    content=ft.Column(
+                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=[
+                            ft.Text(label, weight=ft.FontWeight.BOLD, size=18),
+                            segmented_button_questions,
+                            self.textfield_cards_number,
+                        ],
+                    ),
+                ),
+            )
 
         number_of_questions = ft.Container()
         number_of_questions.content = ft.Column(
             controls=[
-                ft.Row(
-                    [
-                        ft.Text(
-                            "Выбор количества билетов",
-                            weight=ft.FontWeight.BOLD,
-                            text_align=ft.TextAlign.CENTER,
-                            size=20,
-                        )
-                    ],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                ),
-                ft.Divider(),
-                ft.Row(controls=[segmented_button_questions]),
-                self.textfield_number_question_number,
+                card_questions_num("Количество билетов"),
             ]
         )
 
-        checkboxes_rnd = ft.Container()
-        checkboxes_rnd.content = ft.ResponsiveRow(
-            spacing=0,
-            run_spacing=0,
-            controls=[
-                self.checkbox_qualifying,
-                self.checkbox_rnd_simple_questions,
-                self.checkbox_rnd_hard_questions,
-            ],
-        )
+        # INFO: ДОРАБОТАТЬ
+        def rnd_card(question_type: QuestionType) -> ft.Card:
+            if question_type == QuestionType.PRACTICAL:
+                label = "Рандомизация теоретических вопросов"
+            else:
+                label = "Рандомизация практических вопросов"
 
-        textfields_responsive_row = ft.ResponsiveRow(
-            expand=True, alignment=ft.MainAxisAlignment.CENTER
-        )
-        textfields_responsive_row.controls = [
-            ft.Column(
-                col={"sm": 6},
-                controls=[self.textfield_cmk, self.date_row],
-            ),
-            ft.Column(
-                col={"sm": 6},
-                controls=[self.textfield_subject, self.textfield_spec],
-            ),
-            self.textfield_tutor,
-        ]
+            segmented_btn = StyledSegmentedButton(
+                expand=True,
+                segments=[
+                    ft.Segment(
+                        value="none",
+                        icon=ft.Icon("CLOSE"),
+                        label=ft.Text("Не рандомизировать"),
+                        expand=True,
+                    ),
+                    ft.Segment(
+                        value="always",
+                        icon=ft.Icon("SHUFFLE"),
+                        label=ft.Text("Рандомизировать"),
+                        expand=True,
+                    ),
+                    ft.Segment(
+                        value="fallback",
+                        icon=ft.Icon("ROTATE_LEFT"),
+                        label=ft.Text("Если не хватает"),
+                        tooltip="По порядку, а если не хватает — рандомизировать",
+                        expand=True,
+                    ),
+                ],
+                selected={"none"},
+            )
 
-        tab_listview = ft.ListView(expand=True, spacing=10)
-        tab_listview.controls = [
-            textfields_responsive_row,
-            number_of_questions,
-            checkboxes_rnd,
-        ]
+            return ft.Card(
+                content=ft.Container(
+                    padding=20,
+                    content=ft.Column(
+                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=[
+                            ft.Text(label, weight=ft.FontWeight.BOLD, size=18),
+                            segmented_btn,
+                        ],
+                    ),
+                ),
+            )
 
-        tab_buttons = ft.Container(
-            margin=ft.margin.only(left=9, top=0, right=9, bottom=9)
-        )
-        tab_buttons.content = ft.Row(
-            alignment=ft.MainAxisAlignment.CENTER,
+        responsive_row_rnd = ft.ResponsiveRow(
+            spacing=5,
             expand=True,
             controls=[
-                self.button_submit,
-                self.button_clear,
+                ft.Column(
+                    col={"xs": 12, "sm": 6},
+                    expand=True,
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    controls=[rnd_card(QuestionType.PRACTICAL)],
+                ),
+                ft.Column(
+                    col={"xs": 12, "sm": 6},
+                    expand=True,
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    controls=[rnd_card(QuestionType.THEORETICAL)],
+                ),
             ],
+        )
+
+        responsive_row_textfields = ft.ResponsiveRow(
+            expand=True,
+            alignment=ft.MainAxisAlignment.CENTER,
+            controls=[
+                ft.Column(
+                    col={"sm": 6},
+                    controls=[self.textfield_cmk, self.date_row],
+                ),
+                ft.Column(
+                    col={"sm": 6},
+                    controls=[self.textfield_subject, self.textfield_spec],
+                ),
+                self.textfield_tutor,
+            ],
+        )
+        card_textfields = ft.Card(
+            content=ft.Container(
+                padding=20,
+                content=ft.Column(
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    controls=[responsive_row_textfields],
+                ),
+            )
+        )
+
+        tab_listview = ft.ListView(
+            controls=[
+                card_textfields,
+                number_of_questions,
+                responsive_row_rnd,
+            ],
+            expand=True,
+            spacing=10,
+        )
+        tab_buttons = ft.Container(
+            margin=ft.margin.only(left=9, top=0, right=9, bottom=9),
+            content=ft.Row(
+                alignment=ft.MainAxisAlignment.CENTER,
+                expand=True,
+                controls=[
+                    self.button_submit,
+                    self.button_clear,
+                ],
+            ),
         )
 
         tab = ft.Tab()
