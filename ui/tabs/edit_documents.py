@@ -15,6 +15,7 @@ from ui.templates import (
     StyledButton,
     StyledSegmentedButton,
     StyledTextField,
+    WarnPopup,
 )
 
 
@@ -33,7 +34,7 @@ class TabEditDocument(MainUi):
         self.textfield_cmk = StyledTextField(
             label="Председатель ЦМK", max_length=180, on_change=self.on_change_validate
         )
-        self.textfield_cards_number = StyledTextField(
+        self.textfield_ticket_number = StyledTextField(
             label="Количество билетов",
             on_change=self.on_change_validate,
             max_length=3,
@@ -48,13 +49,6 @@ class TabEditDocument(MainUi):
         )
 
         self.checkbox_qualifying = ft.Checkbox(label="Квалификационные билеты")
-        self.checkbox_rnd_simple_questions = ft.Checkbox(
-            label="Рандомизировать теоретические вопросы"
-        )
-        self.checkbox_rnd_hard_questions = ft.Checkbox(
-            label="Рандомизировать практические вопросы"
-        )
-        self.button_clear = StyledButton(text="Очистить поля")
 
         year = dt.date.today().year
         self.date_picker = ft.DatePicker(
@@ -79,6 +73,17 @@ class TabEditDocument(MainUi):
             disabled=True,
             on_click=lambda e: self.on_click_button_submit(e, filepicker, overlay),
         )
+        self.button_clear = StyledButton(text="Очистить поля")
+
+        self.segmented_button_ticket_num = StyledSegmentedButton(
+            selected={"Manual"}, expand=True
+        )
+        self.segmented_btn_theoretical = StyledSegmentedButton(
+            expand=True, selected={"none"}
+        )
+        self.segmented_btn_practical = StyledSegmentedButton(
+            expand=True, selected={"none"}
+        )
 
     # TODO: IMPLEMENT DATEPICKER CHANGE DATE ON DATEROW UPDATE
     def on_change_date_row(self, e):
@@ -96,6 +101,7 @@ class TabEditDocument(MainUi):
             self.textfield_spec,
             self.textfield_subject,
             self.textfield_tutor,
+            self.textfield_ticket_number,
         ):
             field.value = ""
         self.page.update()
@@ -116,16 +122,27 @@ class TabEditDocument(MainUi):
             file_name=f"Билеты промежуточной аттестации{space}{self.textfield_spec.value}.docx",
         )
 
-    def on_change_validate(self, e):
-        self.validate(
-            e,
-            self.page,
-            self.button_submit,
+    def on_change_validate(
+        self,
+        e: ft.ControlEvent,
+    ):
+        textfields = (
             self.textfield_subject,
             self.textfield_spec,
             self.textfield_cmk,
             self.textfield_tutor,
         )
+
+        filled_any = any((tf.value or "").strip() for tf in textfields)
+        number_ok = bool((self.textfield_ticket_number.value or "").strip())
+
+        if self.textfield_ticket_number.disabled:
+            status = not filled_any
+        else:
+            status = not (filled_any and number_ok)
+
+        self.button_submit.disabled = status
+        self.button_submit.update()
 
     def on_pick(self, e: ft.FilePickerResultEvent, overlay: ft.Container):
         if not e.path:
@@ -156,7 +173,29 @@ class TabEditDocument(MainUi):
             overlay.visible = True
             self.page.update()
 
-            self.doc_processing.generate_document(
+            if (
+                not self.segmented_btn_theoretical.selected
+                or not self.segmented_btn_practical.selected
+                or not self.segmented_button_ticket_num.selected
+            ):
+                return
+
+            status_ticket_number = str(
+                next(iter(self.segmented_button_ticket_num.selected))
+            )
+            status_rnd_practical = str(
+                next(iter(self.segmented_btn_practical.selected))
+            )
+            status_rnd_theoretical = str(
+                next(iter(self.segmented_btn_theoretical.selected))
+            )
+
+            num_of_tickets = None
+
+            if self.textfield_ticket_number.value:
+                num_of_tickets = int(self.textfield_ticket_number.value)
+
+            response = self.doc_processing.generate_document(
                 save_to=filepath,
                 subject=(self.textfield_subject.value or ""),
                 spec=(self.textfield_spec.value or ""),
@@ -164,9 +203,17 @@ class TabEditDocument(MainUi):
                 tutor=(self.textfield_tutor.value or ""),
                 date=(self.date_row.value),
                 qualify_status=self.checkbox_qualifying.value,
-                random_simple_question=self.checkbox_rnd_simple_questions.value,
-                random_hard_question=self.checkbox_rnd_hard_questions.value,
+                num_of_tickets=num_of_tickets,
+                status_cards_number=status_ticket_number,
+                status_rnd_practical=status_rnd_practical,
+                status_rnd_theoretical=status_rnd_theoretical,
             )
+            if response is not None:
+                overlay.visible = False
+                overlay.update()
+                self.page.open(WarnPopup(response))
+                return
+
             self.handle_generation_complete(filepath, overlay)
 
             overlay.content = Overlay().content
@@ -206,17 +253,17 @@ class TabEditDocument(MainUi):
 
         def on_segmented_change(e: ft.ControlEvent):
             if e.control.selected != {"Manual"}:
-                self.textfield_cards_number.disabled = True
-                self.textfield_cards_number.update()
+                self.textfield_ticket_number.disabled = True
+                self.textfield_ticket_number.update()
+                self.on_change_validate(e)
                 return
 
-            self.textfield_cards_number.disabled = False
-            self.textfield_cards_number.update()
+            self.textfield_ticket_number.disabled = False
+            self.textfield_ticket_number.update()
+            self.on_change_validate(e)
 
-        segmented_button_questions = StyledSegmentedButton(
-            selected={"Manual"}, on_change=on_segmented_change, expand=True
-        )
-        segmented_button_questions.segments = [
+        self.segmented_button_ticket_num.on_change = on_segmented_change
+        self.segmented_button_ticket_num.segments = [
             ft.Segment(
                 value="Manual",
                 label=ft.Text("Ввод"),
@@ -238,8 +285,8 @@ class TabEditDocument(MainUi):
                         horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                         controls=[
                             ft.Text(label, weight=ft.FontWeight.BOLD, size=18),
-                            segmented_button_questions,
-                            self.textfield_cards_number,
+                            self.segmented_button_ticket_num,
+                            self.textfield_ticket_number,
                         ],
                     ),
                 ),
@@ -256,34 +303,32 @@ class TabEditDocument(MainUi):
         def rnd_card(question_type: QuestionType) -> ft.Card:
             if question_type == QuestionType.PRACTICAL:
                 label = "Рандомизация теоретических вопросов"
+                segmented_btn = self.segmented_btn_practical
             else:
                 label = "Рандомизация практических вопросов"
+                segmented_btn = self.segmented_btn_theoretical
 
-            segmented_btn = StyledSegmentedButton(
-                expand=True,
-                segments=[
-                    ft.Segment(
-                        value="none",
-                        icon=ft.Icon("CLOSE"),
-                        label=ft.Text("Не рандомизировать"),
-                        expand=True,
-                    ),
-                    ft.Segment(
-                        value="always",
-                        icon=ft.Icon("SHUFFLE"),
-                        label=ft.Text("Рандомизировать"),
-                        expand=True,
-                    ),
-                    ft.Segment(
-                        value="fallback",
-                        icon=ft.Icon("ROTATE_LEFT"),
-                        label=ft.Text("Если не хватает"),
-                        tooltip="По порядку, а если не хватает — рандомизировать",
-                        expand=True,
-                    ),
-                ],
-                selected={"none"},
-            )
+            segmented_btn.segments = [
+                ft.Segment(
+                    value="none",
+                    icon=ft.Icon("CLOSE"),
+                    label=ft.Text("Не рандомизировать"),
+                    expand=True,
+                ),
+                ft.Segment(
+                    value="always",
+                    icon=ft.Icon("SHUFFLE"),
+                    label=ft.Text("Рандомизировать"),
+                    expand=True,
+                ),
+                ft.Segment(
+                    value="fallback",
+                    icon=ft.Icon("ROTATE_LEFT"),
+                    label=ft.Text("Когда не хватает"),
+                    tooltip="По порядку, а если не хватает — рандомизировать",
+                    expand=True,
+                ),
+            ]
 
             return ft.Card(
                 content=ft.Container(
@@ -330,6 +375,7 @@ class TabEditDocument(MainUi):
                     controls=[self.textfield_subject, self.textfield_spec],
                 ),
                 self.textfield_tutor,
+                self.checkbox_qualifying,
             ],
         )
         card_textfields = ft.Card(

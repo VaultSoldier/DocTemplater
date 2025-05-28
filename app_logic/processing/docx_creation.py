@@ -41,15 +41,25 @@ class Processing:
         )
         self.theoretical_number_of_questions: int = len(self.theoretical_questions)
 
-    def get_list_safe(self, items_list: list, index: int):
-        try:
-            return items_list[index]
-        except IndexError:
+    def get_list_safe(
+        self, items_list: list, index: int, fallback: Optional[bool] = False
+    ) -> str:
+        if not items_list:
             return ""
 
-    def get_dict_safe(self, dict: dict, index: int) -> str:
         try:
-            value = dict[index]
+            item = items_list[index]
+            return str(item)
+        except IndexError:
+            if fallback:
+                item = str(random.choice(items_list))
+                return item
+
+            return ""
+
+    def get_dict_safe(self, mapping: dict, index: int) -> str:
+        try:
+            value = mapping[index]
         except KeyError:
             value = ""
         return value
@@ -62,9 +72,11 @@ class Processing:
         cmk: str,
         tutor: str,
         date: list,
+        num_of_tickets: int | None,
         qualify_status: bool | None,
-        random_simple_question: bool | None,
-        random_hard_question: bool | None,
+        status_cards_number: str,
+        status_rnd_theoretical: str,
+        status_rnd_practical: str,
     ):
         """Const generator for template and entrypoint"""
         logging.info(
@@ -73,6 +85,19 @@ class Processing:
 
         # ОБНОВЛЕНИЕ ВОПРОСОВ
         self.questions_import()
+
+        if status_cards_number == "Manual" and num_of_tickets:
+            tickets = range(num_of_tickets)
+        elif status_cards_number == "Practical":
+            if self.practical_number_of_questions == 0:
+                return "Нету практических вопросов"
+            tickets = range(self.practical_number_of_questions)
+        elif status_cards_number == "Theoretical":
+            if self.theoretical_number_of_questions == 0:
+                return "Нету теоретических вопросов"
+            tickets = range(self.theoretical_number_of_questions)
+        else:
+            return "Неизвестная ошибка"
 
         day = date[2] or "__"
         month = date[1] or ""
@@ -117,7 +142,38 @@ class Processing:
         tpl.render(context)
         tpl.save(self.path_tmp_base.name)
 
-        tmp_files = self.replace_questions(random_simple_question, random_hard_question)
+        if len(tickets) == 1:
+            i = tickets[0]
+            if status_rnd_practical == "always":
+                q1 = random.choice(self.practical_questions)
+            elif status_rnd_practical == "fallback":
+                q1 = self.get_list_safe(self.practical_questions, i, True)
+            else:
+                q1 = self.get_list_safe(self.practical_questions, i)
+
+            if status_rnd_theoretical == "always":
+                q2 = random.choice(self.theoretical_questions)
+            elif status_rnd_theoretical == "fallback":
+                q2 = self.get_list_safe(self.theoretical_questions, i, True)
+            else:
+                q2 = self.get_list_safe(self.theoretical_questions, i)
+
+            tpl_single = DocxTemplate(self.path_tmp_base.name)
+            self.docx_save(
+                question_1=q1,
+                question_2=q2,
+                ticket_num=str(i + 1),
+                tmpfile=self.path_tmp_base,
+                tpl=tpl_single,
+            )
+            tpl_single.save(save_to)
+            return
+
+        tmp_files = self.replace_questions(
+            status_rnd_practical=status_rnd_practical,
+            status_rnd_theoretical=status_rnd_theoretical,
+            tickets=tickets,
+        )
         self.document_merge(tmp_files, save_to)
 
     def docx_save(
@@ -135,27 +191,39 @@ class Processing:
         tpl.save(tmpfile.name)
 
     def replace_questions(
-        self, random_simple_question: bool | None, random_hard_question: bool | None
+        self,
+        status_rnd_practical: str,
+        status_rnd_theoretical: str,
+        tickets: range,
     ) -> list[tempfile._TemporaryFileWrapper]:
         """Replace questions"""
+
         tpl = DocxTemplate(self.path_tmp_base.name)
         tmpfiles = []
-        for i in range(self.practical_number_of_questions):
+
+        for i in tickets:
             temp_file_num = f"tmp_{i}"
             tmpfile = tempfile.NamedTemporaryFile(
                 prefix=temp_file_num, suffix=".docx", delete=True
             )
 
-            if random_simple_question and self.practical_questions:
+            if status_rnd_practical == "always" and self.practical_questions:
                 question_1 = str(random.choice(self.practical_questions))
+            elif status_rnd_practical == "fallback":
+                question_1 = self.get_list_safe(self.practical_questions, i, True)
+            elif status_rnd_practical == "none":
+                question_1 = self.get_list_safe(self.practical_questions, i)
             else:
-                question_1 = str(self.practical_questions[i])
+                question_1 = ""
 
-            if random_hard_question and self.theoretical_questions:
+            if status_rnd_theoretical == "always" and self.theoretical_questions:
                 question_2 = str(random.choice(self.theoretical_questions))
+            elif status_rnd_theoretical == "fallback":
+                question_2 = self.get_list_safe(self.theoretical_questions, i, True)
+            elif status_rnd_theoretical == "none":
+                question_2 = self.get_list_safe(self.theoretical_questions, i)
             else:
-                question_raw = self.get_list_safe(self.theoretical_questions, i)
-                question_2 = str(question_raw)
+                question_2 = ""
 
             self.docx_save(
                 question_1=str(question_1),
@@ -179,14 +247,11 @@ class Processing:
         # master file page break
         master.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
-        for ticket in range(1, self.practical_number_of_questions):
-            doc = Document(tmp_paths[ticket])
-
-            if ticket != (self.practical_number_of_questions - 1):
-                doc.add_page_break()
-
+        for idx, tmp in enumerate(tmp_paths[1:], start=1):
+            doc = Document(tmp.name)
             composer.append(doc)
-
+            if idx != len(tmp_paths) - 1:
+                master.add_page_break()
         composer.save(save_to)
         self.cleaning(tmp_paths)
 
