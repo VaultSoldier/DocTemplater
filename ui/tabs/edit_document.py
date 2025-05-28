@@ -17,6 +17,9 @@ from ui.templates import (
     StyledTextField,
     WarnPopup,
 )
+import locale
+
+locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
 
 class TabEditDocument(MainUi):
@@ -92,6 +95,7 @@ class TabEditDocument(MainUi):
     def on_change_date_picker(self, e):
         date = e.control.value
         formatted = f"{date.year}.{date.strftime('%B')}.{date.day}".split(".")
+        print(formatted)
         self.date_row.value = formatted
         self.page.update()
 

@@ -1,6 +1,6 @@
 import flet as ft
 import logging
-from ui.tabs.edit_documents import TabEditDocument
+from ui.tabs.edit_document import TabEditDocument
 from ui.tabs.edit_questions import TabEditQuestions
 from app_logic import MainUi
 
