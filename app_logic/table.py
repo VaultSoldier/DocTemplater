@@ -1,7 +1,7 @@
 from typing import Any
 
 
-def get_selected_questions(
+def get_selected_row_questions(
     questions: dict[int, Any], selected_rows: dict[int, Any]
 ) -> dict[int, Any]:
     tmp = questions.copy()

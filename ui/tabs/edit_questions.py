@@ -4,7 +4,7 @@ import re
 
 import flet as ft
 
-from app_logic.table import get_selected_questions
+from app_logic.table import get_selected_row_questions
 from app_logic.processing.data_operations import (
     SqliteData,
     TextProcessing,
@@ -308,7 +308,7 @@ class EditQuestionsTabController:
             questions_label = ft.Text("Теоретические Вопросы")
 
         questions = self.sqlite.read_questions_dict(question_type)
-        new_questions = get_selected_questions(questions, selected_rows)
+        new_questions = get_selected_row_questions(questions, selected_rows)
         textfield_storage: dict[int, str] = dict(new_questions)
         items_len = len(new_questions)
 

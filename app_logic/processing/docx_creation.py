@@ -144,8 +144,12 @@ class Processing:
 
         if len(tickets) == 1:
             i = tickets[0]
-            question_1, question_2 = self.get_selected_questions(
-                status_rnd_practical, status_rnd_theoretical, i
+
+            question_1 = self.get_selected_questions(
+                QuestionType.PRACTICAL, status_rnd_practical, i
+            )
+            question_2 = self.get_selected_questions(
+                QuestionType.THEORETICAL, status_rnd_theoretical, i
             )
 
             tpl_single = DocxTemplate(self.path_tmp_base.name)
@@ -181,31 +185,26 @@ class Processing:
         tpl.save(tmpfile.name)
 
     def get_selected_questions(
-        self, status_rnd_practical, status_rnd_theoretical, question_index
+        self,
+        question_type: QuestionType,
+        status_rnd: str,
+        question_index: int,
     ):
-        if status_rnd_practical == "always" and self.practical_questions:
-            question_1 = str(random.choice(self.practical_questions))
-        elif status_rnd_practical == "fallback":
-            question_1 = self.get_list_safe(
-                self.practical_questions, question_index, True
-            )
-        elif status_rnd_practical == "none":
-            question_1 = self.get_list_safe(self.practical_questions, question_index)
-        else:
-            question_1 = ""
+        if question_type == QuestionType.PRACTICAL:
+            questions_list = self.practical_questions
+        elif question_type == QuestionType.THEORETICAL:
+            questions_list = self.theoretical_questions
 
-        if status_rnd_theoretical == "always" and self.theoretical_questions:
-            question_2 = str(random.choice(self.theoretical_questions))
-        elif status_rnd_theoretical == "fallback":
-            question_2 = self.get_list_safe(
-                self.theoretical_questions, question_index, True
-            )
-        elif status_rnd_theoretical == "none":
-            question_2 = self.get_list_safe(self.theoretical_questions, question_index)
+        if status_rnd == "always" and self.practical_questions:
+            question = str(random.choice(questions_list))
+        elif status_rnd == "fallback":
+            question = self.get_list_safe(questions_list, question_index, True)
+        elif status_rnd == "none":
+            question = self.get_list_safe(questions_list, question_index)
         else:
-            question_2 = ""
+            question = ""
 
-        return question_1, question_2
+        return question
 
     def replace_questions(
         self,
@@ -224,8 +223,11 @@ class Processing:
                 prefix=temp_file_num, suffix=".docx", delete=True
             )
 
-            question_1, question_2 = self.get_selected_questions(
-                status_rnd_practical, status_rnd_theoretical, i
+            question_1 = self.get_selected_questions(
+                QuestionType.PRACTICAL, status_rnd_practical, i
+            )
+            question_2 = self.get_selected_questions(
+                QuestionType.THEORETICAL, status_rnd_theoretical, i
             )
 
             self.docx_save(
