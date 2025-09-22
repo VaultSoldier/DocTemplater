@@ -119,9 +119,7 @@ class EditQuestionsTabController:
         overlay.visible = False
 
         def warning():
-            self.page.open(
-                WarnPopup("Выберите документ (.docx) или текстовый файл (.txt)")
-            )
+            self.page.open(WarnPopup("Выберите документ (.docx) или текстовый файл (.txt)"))
 
         if not e.files:
             warning()
