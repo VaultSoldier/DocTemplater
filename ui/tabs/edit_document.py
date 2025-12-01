@@ -282,19 +282,19 @@ class TabEditDocument(MainUi):
         ]
 
         def card_questions_num(label: str) -> ft.Card:
-            return ft.Card(
-                content=ft.Container(
-                    padding=20,
-                    content=ft.Column(
-                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                        controls=[
-                            ft.Text(label, weight=ft.FontWeight.BOLD, size=18),
-                            self.segmented_button_ticket_num,
-                            self.textfield_ticket_number,
-                        ],
-                    ),
-                ),
+            column = ft.Column(
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                controls=[
+                    ft.Text(label, weight=ft.FontWeight.BOLD, size=16),
+                    self.segmented_button_ticket_num,
+                    self.textfield_ticket_number,
+                ],
             )
+            container = ft.Container(
+                padding=12,
+                content=column,
+            )
+            return ft.Card(content=container)
 
         number_of_questions = ft.Container()
         number_of_questions.content = ft.Column(
@@ -334,18 +334,18 @@ class TabEditDocument(MainUi):
                 ),
             ]
 
-            return ft.Card(
-                content=ft.Container(
-                    padding=20,
-                    content=ft.Column(
-                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                        controls=[
-                            ft.Text(label, weight=ft.FontWeight.BOLD, size=18),
-                            segmented_btn,
-                        ],
-                    ),
+            card = ft.Card()
+            card.content = ft.Container(
+                padding=12,
+                content=ft.Column(
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    controls=[
+                        ft.Text(label, weight=ft.FontWeight.BOLD, size=16),
+                        segmented_btn,
+                    ],
                 ),
             )
+            return card
 
         responsive_row_rnd = ft.ResponsiveRow(
             spacing=5,
@@ -384,7 +384,7 @@ class TabEditDocument(MainUi):
         )
         card_textfields = ft.Card(
             content=ft.Container(
-                padding=20,
+                padding=12,
                 content=ft.Column(
                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                     controls=[responsive_row_textfields],
