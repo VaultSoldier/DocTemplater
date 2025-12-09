@@ -173,57 +173,55 @@ class TabEditDocument(MainUi):
         )
         loading_ui.controls = [text, ft.ProgressRing()]
 
-        def thread():
-            overlay.content = loading_ui
-            overlay.visible = True
-            self.page.update()
+        overlay.content = loading_ui
+        overlay.visible = True
+        self.page.update()
 
-            if (
-                not self.segmented_btn_theoretical.selected
-                or not self.segmented_btn_practical.selected
-                or not self.segmented_button_ticket_num.selected
-            ):
-                return
+        if (
+            not self.segmented_btn_theoretical.selected
+            or not self.segmented_btn_practical.selected
+            or not self.segmented_button_ticket_num.selected
+        ):
+            return
 
-            status_ticket_number = str(
-                next(iter(self.segmented_button_ticket_num.selected))
-            )
-            status_rnd_practical = str(
-                next(iter(self.segmented_btn_practical.selected))
-            )
-            status_rnd_theoretical = str(
-                next(iter(self.segmented_btn_theoretical.selected))
-            )
+        status_ticket_number = str(
+            next(iter(self.segmented_button_ticket_num.selected))
+        )
+        status_rnd_practical = str(
+            next(iter(self.segmented_btn_practical.selected))
+        )
+        status_rnd_theoretical = str(
+            next(iter(self.segmented_btn_theoretical.selected))
+        )
 
-            num_of_tickets = None
+        num_of_tickets = None
 
-            if self.textfield_ticket_number.value:
-                num_of_tickets = int(self.textfield_ticket_number.value)
+        if self.textfield_ticket_number.value:
+            num_of_tickets = int(self.textfield_ticket_number.value)
 
-            response = self.doc_processing.generate_document(
-                save_to=filepath,
-                subject=(self.textfield_subject.value or ""),
-                spec=(self.textfield_spec.value or ""),
-                cmk=(self.textfield_cmk.value or ""),
-                tutor=(self.textfield_tutor.value or ""),
-                date=(self.date_row.value),
-                qualify_status=self.checkbox_qualifying.value,
-                num_of_tickets=num_of_tickets,
-                status_cards_number=status_ticket_number,
-                status_rnd_practical=status_rnd_practical,
-                status_rnd_theoretical=status_rnd_theoretical,
-            )
-            if response is not None:
-                overlay.visible = False
-                overlay.update()
-                self.page.open(WarnPopup(response))
-                return
+        response = self.doc_processing.generate_document(
+            save_to=filepath,
+            subject=(self.textfield_subject.value or ""),
+            spec=(self.textfield_spec.value or ""),
+            cmk=(self.textfield_cmk.value or ""),
+            tutor=(self.textfield_tutor.value or ""),
+            date=(self.date_row.value),
+            qualify_status=self.checkbox_qualifying.value,
+            num_of_tickets=num_of_tickets,
+            status_cards_number=status_ticket_number,
+            status_rnd_practical=status_rnd_practical,
+            status_rnd_theoretical=status_rnd_theoretical,
+        )
+        if response is not None:
+            overlay.visible = False
+            overlay.update()
+            self.page.open(WarnPopup(response))
+            return
 
-            self.handle_generation_complete(filepath, overlay)
+        self.handle_generation_complete(filepath, overlay)
 
-            overlay.content = Overlay().content
+        overlay.content = Overlay().content
 
-        self.page.run_thread(thread)
 
     def handle_generation_complete(self, filepath: str, overlay: ft.Container):
         overlay.visible = False

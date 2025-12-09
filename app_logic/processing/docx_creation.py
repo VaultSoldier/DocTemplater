@@ -26,9 +26,7 @@ class Processing:
         self.theoretical_questions: list[str] = []
         self.theoretical_number_of_questions: int = 0
 
-        self.path_tmp_base = tempfile.NamedTemporaryFile(
-            prefix="tmp_base_", suffix=".docx", delete=True
-        )
+        self.tmp_base = tempfile.NamedTemporaryFile(prefix="tmp_base_", suffix=".docx")
 
     def questions_import(self):
         self.practical_questions: list[str] = self.sql.read_questions_list(
@@ -140,7 +138,7 @@ class Processing:
 
         tpl = DocxTemplate(self.PATH_BASE_DOC)
         tpl.render(context)
-        tpl.save(self.path_tmp_base.name)
+        tpl.save(self.tmp_base.name)
 
         if len(tickets) == 1:
             i = tickets[0]
@@ -152,12 +150,12 @@ class Processing:
                 QuestionType.THEORETICAL, status_rnd_theoretical, i
             )
 
-            tpl_single = DocxTemplate(self.path_tmp_base.name)
+            tpl_single = DocxTemplate(self.tmp_base.name)
             self.docx_save(
                 question_1=question_1,
                 question_2=question_2,
                 ticket_num=str(i + 1),
-                tmpfile=self.path_tmp_base,
+                tmpfile=self.tmp_base,
                 tpl=tpl_single,
             )
             tpl_single.save(save_to)
@@ -214,14 +212,12 @@ class Processing:
     ) -> list[tempfile._TemporaryFileWrapper]:
         """Replace questions"""
 
-        tpl = DocxTemplate(self.path_tmp_base.name)
+        tpl = DocxTemplate(self.tmp_base.name)
         tmpfiles = []
 
         for i in tickets:
             temp_file_num = f"tmp_{i}"
-            tmpfile = tempfile.NamedTemporaryFile(
-                prefix=temp_file_num, suffix=".docx", delete=True
-            )
+            tmpfile = tempfile.NamedTemporaryFile(prefix=temp_file_num, suffix=".docx")
 
             question_1 = self.get_selected_questions(
                 QuestionType.PRACTICAL, status_rnd_practical, i
@@ -261,17 +257,37 @@ class Processing:
         self.cleaning(tmp_paths)
 
     def cleaning(self, paths: list[tempfile._TemporaryFileWrapper]):
+        # clean temporary files
         file_path = ""
-        for temp_file in paths:
+        for tmp_file in paths:
             try:
-                file_path = temp_file.name
+                file_path = tmp_file.name
 
-                if not temp_file.closed:
-                    temp_file.close()
+                # Deletes files on UNIX
+                # And makes sure it closes before deleting on non UNIX
+                if not tmp_file.closed:
+                    tmp_file.close()
+                    logging.info(f"Closed temp file: {file_path}")
 
+                # Deletes files on non UNIX systems
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    logging.info(f"Deleted temporary file: {file_path}")
+                    logging.info(f"Deleted temp file: {file_path}")
 
             except Exception as e:
                 logging.error(f"Failed to delete {file_path}: {e}")
+
+        # clean temporary base file
+        tmp_base_path = self.tmp_base.name
+        if os.path.exists(tmp_base_path):
+            try:
+                if not self.tmp_base.closed:
+                    logging.info(f"Closed temp base file: {tmp_base_path}")
+                    self.tmp_base.close()
+
+                if os.path.exists(tmp_base_path):
+                    os.remove(tmp_base_path)
+                    logging.info(f"Deleted temp file: {tmp_base_path}")
+
+            except Exception as e:
+                logging.error(f"Failed to delete {self.tmp_base.name}: {e}")
