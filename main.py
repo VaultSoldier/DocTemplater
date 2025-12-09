@@ -1,10 +1,9 @@
 import flet as ft
-import logging
 from ui.tabs.edit_document import TabEditDocument
 from ui.tabs.edit_questions import TabEditQuestions
 from app_logic import MainUi
+import logging
 
-# INFO: MAKE SEPPARATE FILE FOR logging CONFIG
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(message)s",
@@ -29,7 +28,7 @@ class DocTemplater(MainUi):
         tab_edit_questions = TabEditQuestions(self.page, label_edit_questions)
 
         tabs = ft.Tabs(
-            label_text_style=ft.TextStyle(size=16),
+            label_text_style=ft.TextStyle(size=14),
             selected_index=0,
             animation_duration=80,
             divider_height=1.70,

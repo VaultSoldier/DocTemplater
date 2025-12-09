@@ -17,6 +17,7 @@ from ui.templates import (
     StyledTextField,
     WarnPopup,
 )
+from config import config
 import locale
 
 locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
@@ -82,10 +83,10 @@ class TabEditDocument(MainUi):
             selected={"Manual"}, expand=True
         )
         self.segmented_btn_theoretical = StyledSegmentedButton(
-            expand=True, selected={"none"}
+            expand=True, selected={"fallback"}
         )
         self.segmented_btn_practical = StyledSegmentedButton(
-            expand=True, selected={"none"}
+            expand=True, selected={"fallback"}
         )
 
     # TODO: IMPLEMENT DATEPICKER CHANGE DATE ON DATEROW UPDATE
@@ -281,13 +282,12 @@ class TabEditDocument(MainUi):
             ),
         ]
 
-        def card_questions_num(label: str) -> ft.Card:
+        def card_questions_num() -> ft.Card:
             column = ft.Column(
                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                 controls=[
-                    ft.Text(label, weight=ft.FontWeight.BOLD, size=16),
-                    self.segmented_button_ticket_num,
                     self.textfield_ticket_number,
+                    self.segmented_button_ticket_num,
                 ],
             )
             container = ft.Container(
@@ -296,14 +296,12 @@ class TabEditDocument(MainUi):
             )
             return ft.Card(content=container)
 
-        number_of_questions = ft.Container()
-        number_of_questions.content = ft.Column(
+        number_of_questions = ft.Column(
             controls=[
-                card_questions_num("Количество билетов"),
+                card_questions_num(),
             ]
         )
 
-        # INFO: ДОРАБОТАТЬ
         def rnd_card(question_type: QuestionType) -> ft.Card:
             if question_type == QuestionType.PRACTICAL:
                 label = "Рандомизация теоретических вопросов"
@@ -314,22 +312,24 @@ class TabEditDocument(MainUi):
 
             segmented_btn.segments = [
                 ft.Segment(
-                    value="none",
-                    icon=ft.Icon("CLOSE"),
-                    label=ft.Text("Не рандомизировать"),
+                    value="fallback",
+                    icon=ft.Icon("ROTATE_LEFT"),
+                    label=ft.Text("Случайные, если не хватает"),
+                    tooltip="По порядку, а если не хватает — рандомизировать",
                     expand=True,
                 ),
                 ft.Segment(
                     value="always",
                     icon=ft.Icon("SHUFFLE"),
-                    label=ft.Text("Рандомизировать"),
+                    label=ft.Text("Случайный порядок"),
+                    tooltip="Всегда случайный вопрос",
                     expand=True,
                 ),
                 ft.Segment(
-                    value="fallback",
-                    icon=ft.Icon("ROTATE_LEFT"),
-                    label=ft.Text("Когда не хватает"),
-                    tooltip="По порядку, а если не хватает — рандомизировать",
+                    value="none",
+                    icon=ft.Icon("CLOSE"),
+                    label=ft.Text("Не случайные"),
+                    tooltip="Последовательный, не случайный порядок",
                     expand=True,
                 ),
             ]
@@ -340,7 +340,7 @@ class TabEditDocument(MainUi):
                 content=ft.Column(
                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                     controls=[
-                        ft.Text(label, weight=ft.FontWeight.BOLD, size=16),
+                        ft.Text(label, weight=config.fontweight, size=config.fontsize),
                         segmented_btn,
                     ],
                 ),
@@ -399,7 +399,7 @@ class TabEditDocument(MainUi):
                 responsive_row_rnd,
             ],
             expand=True,
-            spacing=10,
+            spacing=4,
         )
         tab_buttons = ft.Container(
             margin=ft.margin.only(left=9, top=0, right=9, bottom=9),
@@ -424,6 +424,6 @@ class TabEditDocument(MainUi):
         tab.content = ft.Column(
             expand=True,
             spacing=0,
-            controls=[ft.Container(tab_listview, expand=1, padding=10), tab_buttons],
+            controls=[ft.Container(tab_listview, expand=1, padding=9), tab_buttons],
         )
         return tab
