@@ -184,15 +184,9 @@ class TabEditDocument(MainUi):
         ):
             return
 
-        tickets_count_type = str(
-            next(iter(self.segmented_button_ticket_num.selected))
-        )
-        practical_rnd_type = str(
-            next(iter(self.segmented_btn_practical.selected))
-        )
-        theoretical_rnd_type = str(
-            next(iter(self.segmented_btn_theoretical.selected))
-        )
+        tickets_count_type = str(next(iter(self.segmented_button_ticket_num.selected)))
+        practical_rnd_type = str(next(iter(self.segmented_btn_practical.selected)))
+        theoretical_rnd_type = str(next(iter(self.segmented_btn_theoretical.selected)))
 
         tickets_count = None
 
@@ -221,7 +215,6 @@ class TabEditDocument(MainUi):
         self.handle_generation_complete(filepath, overlay)
 
         overlay.content = Overlay().content
-
 
     def handle_generation_complete(self, filepath: str, overlay: ft.Container):
         overlay.visible = False
