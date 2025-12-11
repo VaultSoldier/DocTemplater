@@ -1,11 +1,12 @@
 import datetime as dt
+import time
 import logging
 
 import flet as ft
 from anyio import Path
 
 from app_logic import MainUi
-from app_logic.processing.docx_creation import Processing
+from app_logic.processing.docx import DocxProcessingError, Processing
 from app_logic.types import QuestionType
 from app_logic.ui import open_file
 from ui.templates import (
@@ -26,7 +27,7 @@ locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 class TabEditDocument(MainUi):
     def __init__(self, page: ft.Page, tab_label: ft.Text) -> None:
         self.tab_label = tab_label
-        self.doc_processing = Processing()
+        self.docx_processing = Processing()
         self.page = page
 
         self.textfield_subject = StyledTextField(
@@ -163,7 +164,6 @@ class TabEditDocument(MainUi):
         text = ft.Text(
             "Документ создается...",
             size=32,
-            color="white",
             weight=ft.FontWeight.BOLD,
             text_align=ft.TextAlign.CENTER,
         )
@@ -193,33 +193,42 @@ class TabEditDocument(MainUi):
         if self.textfield_ticket_number.value:
             tickets_count = int(self.textfield_ticket_number.value)
 
-        response = self.doc_processing.process_document(
-            save_to=filepath,
-            subject=(self.textfield_subject.value or ""),
-            spec=(self.textfield_spec.value or ""),
-            cmk=(self.textfield_cmk.value or ""),
-            tutor=(self.textfield_tutor.value or ""),
-            date=(self.date_row.value),
-            qualify_status=self.checkbox_qualifying.value,
-            tickets_count=tickets_count,
-            tickets_count_type=tickets_count_type,
-            practical_rnd_type=practical_rnd_type,
-            theoretical_rnd_type=theoretical_rnd_type,
-        )
-        if response is not None:
+        try:
+            response = self.docx_processing.process_docx(
+                save_to=filepath,
+                subject=(self.textfield_subject.value or ""),
+                spec=(self.textfield_spec.value or ""),
+                cmk=(self.textfield_cmk.value or ""),
+                tutor=(self.textfield_tutor.value or ""),
+                date=(self.date_row.value),
+                qualify_status=self.checkbox_qualifying.value,
+                tickets_count=tickets_count,
+                tickets_count_type=tickets_count_type,
+                practical_rnd_type=practical_rnd_type,
+                theoretical_rnd_type=theoretical_rnd_type,
+            )
+        except DocxProcessingError as error:
+            logging.info(f"Error processing docx: {error}'")
             overlay.visible = False
             overlay.update()
-            self.page.open(WarnPopup(response))
+            overlay.content = Overlay().content
+
+            self.page.open(WarnPopup(error))
             return
 
-        self.handle_generation_complete(filepath, overlay)
-
+        self.handle_generation_complete(filepath)
+        overlay.visible = False
+        overlay.update()
         overlay.content = Overlay().content
 
-    def handle_generation_complete(self, filepath: str, overlay: ft.Container):
-        overlay.visible = False
-        self.page.update()
+        if not response:
+            return
 
+        self.page.run_thread(
+            lambda: self.docx_processing.clean(path=response[0], paths=response[1])
+        )
+
+    def handle_generation_complete(self, filepath: str):
         dialog = StyledAlertDialog(
             title=ft.Text("Документ создан", text_align=ft.TextAlign.CENTER),
             alignment=ft.Alignment(0, 0),

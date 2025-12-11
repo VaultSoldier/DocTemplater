@@ -4,13 +4,13 @@ from typing import Any
 import flet as ft
 
 from app_logic.table import get_selected_row_questions
-from app_logic.processing.data_operations import (
+from app_logic.processing.data import (
     SqliteData,
     TextProcessing,
     clean_question_by_regex,
     docx_extract_questions,
 )
-from app_logic.processing.docx_creation import Processing
+from app_logic.processing.docx import Processing
 from app_logic.types import QuestionType
 from ui.templates import (
     Overlay,

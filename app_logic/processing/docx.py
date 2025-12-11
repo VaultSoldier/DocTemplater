@@ -3,13 +3,27 @@ import logging
 import random
 import tempfile
 import math
-from typing import Final, Iterable, Optional
+from typing import Final, Iterable, List, Optional
 from docx.enum.text import WD_BREAK
 from docxtpl import DocxTemplate, RichText
 from docx import Document
 from docxcompose.composer import Composer
-from app_logic.processing.data_operations import SqliteData, get_resource_path_temp
+from app_logic.processing.data import SqliteData, get_resource_path_temp
 from app_logic.types import QuestionType
+
+
+class DocxProcessingError(Exception):
+    """Базовое исключение."""
+
+    pass
+
+
+class NoQuestionsError(DocxProcessingError):
+    pass
+
+
+class UnknownTicketTypeError(DocxProcessingError):
+    pass
 
 
 class Processing:
@@ -59,7 +73,7 @@ class Processing:
             value = ""
         return value
 
-    def process_document(
+    def process_docx(
         self,
         save_to: str,
         subject: str,
@@ -72,7 +86,13 @@ class Processing:
         tickets_count_type: str,
         theoretical_rnd_type: str,
         practical_rnd_type: str,
-    ) -> None | str:
+    ) -> (
+        None
+        | tuple[
+            tempfile._TemporaryFileWrapper,
+            List[tempfile._TemporaryFileWrapper],
+        ]
+    ):
         logging.info(
             f"subject: {subject}\nspec: {spec}\ncmk: {cmk}\ntutor: {tutor}\ndate: {date}\n"
         )
@@ -81,33 +101,27 @@ class Processing:
         self.questions_import()
 
         match tickets_count_type:
+            case "Practical" if self.practical_questions_count <= 0:
+                raise NoQuestionsError("Нету практических вопросов")
+            case "Theoretical" if self.theoretical_questions_count <= 0:
+                raise NoQuestionsError("Нету теоретических вопросов")
+
             case "Manual" if tickets_count is not None:
                 tickets = range(tickets_count)
-
-            case "Practical" if self.practical_questions_count <= 0:
-                return "Нету практических вопросов"
             case "Practical":
                 tickets = range(self.practical_questions_count)
-
-            case "Theoretical" if self.theoretical_questions_count <= 0:
-                return "Нету теоретических вопросов"
             case "Theoretical":
                 tickets = range(self.theoretical_questions_count)
 
             case _:
-                return "Неизвестная ошибка"
+                raise UnknownTicketTypeError(
+                    f"Неизвестный тип билетов: {tickets_count_type}"
+                )
 
-        day = date[2] or "__"
+        qualify = " (квалификационный)" if qualify_status else ""
+        day = f"{int(date[2]):02}" or "__"  # add "0" to single num (1 = 01, 10 = 10)
         month = date[1] or ""
         year = date[0] or ""
-
-        if qualify_status:
-            qualify = " (квалификационный)"
-        else:
-            qualify = ""
-
-        if day in range(0, 10):
-            day = "0" + str(day)
 
         rt_day = RichText()
         rt_month = RichText()
@@ -158,18 +172,18 @@ class Processing:
             "question_two": "{{question_two}}",
         }
         context.update(context_extend)
-        tmp_base = tempfile.NamedTemporaryFile(prefix="tmp_base_", suffix=".docx")
+        tmp_base_docx_file = tempfile.NamedTemporaryFile(prefix="tmp_base_", suffix=".docx")
         tpl.render(context)
-        tpl.save(tmp_base.name)
-        tmp_files = self.replace_questions(
+        tpl.save(tmp_base_docx_file.name)
+        tmp_docx_files = self.replace_questions(
             status_rnd_practical=practical_rnd_type,
             status_rnd_theoretical=theoretical_rnd_type,
             tickets=tickets,
-            tpl_template_file=tmp_base,
+            tpl_template_file=tmp_base_docx_file,
         )
 
-        self.docx_merge(tmp_files, save_to)
-        self.clean(path=tmp_base, paths=tmp_files)
+        self.docx_merge(tmp_docx_files, save_to)
+        return tmp_base_docx_file, tmp_docx_files
 
     def get_selected_questions(
         self,
@@ -217,7 +231,6 @@ class Processing:
                 QuestionType.THEORETICAL, status_rnd_theoretical, i
             )
 
-            logging.info(f"Ticket {i+1}: Q1='{question_one}', Q2='{question_two}'")
             context = {
                 "ticket_num": f"{i+1}",
                 "question_one": question_one,
@@ -267,10 +280,8 @@ class Processing:
                 # And makes sure it closes before deleting on non UNIX
                 if not file.closed:
                     file.close()
-                    logging.info(f"Closed temp file: {file_path}")
                 # Deletes files on non UNIX systems
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    logging.info(f"Deleted temp file: {file_path}")
             except Exception as e:
                 logging.error(f"Failed to delete {file.name}: {e}")

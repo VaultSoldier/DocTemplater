@@ -34,13 +34,15 @@ class SqliteData:
         self.con = sqlite3.connect(database=self.filepath, autocommit=True)
         self.cur = self.con.cursor()
 
-        self.cur.execute("""
+        self.cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS questions (
                 id INTEGER PRIMARY KEY,
                 question UNICODE NOT NULL,
                 question_type TEXT CHECK (question_type IN ('theory', 'practice'))
             )
-            """)
+            """
+        )
 
     def add_line(self, line: str, question_type: QuestionType):
         if not isinstance(line, str) or len(line.strip()) == 0:
