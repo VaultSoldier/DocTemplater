@@ -184,22 +184,22 @@ class TabEditDocument(MainUi):
         ):
             return
 
-        status_ticket_number = str(
+        tickets_count_type = str(
             next(iter(self.segmented_button_ticket_num.selected))
         )
-        status_rnd_practical = str(
+        practical_rnd_type = str(
             next(iter(self.segmented_btn_practical.selected))
         )
-        status_rnd_theoretical = str(
+        theoretical_rnd_type = str(
             next(iter(self.segmented_btn_theoretical.selected))
         )
 
-        num_of_tickets = None
+        tickets_count = None
 
         if self.textfield_ticket_number.value:
-            num_of_tickets = int(self.textfield_ticket_number.value)
+            tickets_count = int(self.textfield_ticket_number.value)
 
-        response = self.doc_processing.generate_document(
+        response = self.doc_processing.process_document(
             save_to=filepath,
             subject=(self.textfield_subject.value or ""),
             spec=(self.textfield_spec.value or ""),
@@ -207,10 +207,10 @@ class TabEditDocument(MainUi):
             tutor=(self.textfield_tutor.value or ""),
             date=(self.date_row.value),
             qualify_status=self.checkbox_qualifying.value,
-            num_of_tickets=num_of_tickets,
-            status_cards_number=status_ticket_number,
-            status_rnd_practical=status_rnd_practical,
-            status_rnd_theoretical=status_rnd_theoretical,
+            tickets_count=tickets_count,
+            tickets_count_type=tickets_count_type,
+            practical_rnd_type=practical_rnd_type,
+            theoretical_rnd_type=theoretical_rnd_type,
         )
         if response is not None:
             overlay.visible = False

@@ -3,7 +3,7 @@ import logging
 import random
 import tempfile
 import math
-from typing import Final, Optional
+from typing import Final, Iterable, Optional
 from docx.enum.text import WD_BREAK
 from docxtpl import DocxTemplate, RichText
 from docx import Document
@@ -12,7 +12,6 @@ from app_logic.processing.data_operations import SqliteData, get_resource_path_t
 from app_logic.types import QuestionType
 
 
-# INFO: МОЖНО ОПТИМИЗИРОВАТЬ ПЕРЕДАВАЯ ВОПРОСЫ, А НЕ ЗАГРУЖАТЬ ИХ
 class Processing:
     def __init__(self) -> None:
         self.PATH_BASE_DOC: Final[str] = get_resource_path_temp(
@@ -21,23 +20,21 @@ class Processing:
         self.sql = SqliteData()
 
         self.practical_questions: list[str] = []
-        self.practical_number_of_questions: int = 0
+        self.practical_questions_count: int = 0
 
         self.theoretical_questions: list[str] = []
-        self.theoretical_number_of_questions: int = 0
-
-        self.tmp_base = tempfile.NamedTemporaryFile(prefix="tmp_base_", suffix=".docx")
+        self.theoretical_questions_count: int = 0
 
     def questions_import(self):
         self.practical_questions: list[str] = self.sql.read_questions_list(
             QuestionType.PRACTICAL
         )
-        self.practical_number_of_questions: int = len(self.practical_questions)
+        self.practical_questions_count: int = len(self.practical_questions)
 
         self.theoretical_questions: list[str] = self.sql.read_questions_list(
             QuestionType.THEORETICAL
         )
-        self.theoretical_number_of_questions: int = len(self.theoretical_questions)
+        self.theoretical_questions_count: int = len(self.theoretical_questions)
 
     def get_list_safe(
         self, items_list: list, index: int, fallback: Optional[bool] = False
@@ -62,7 +59,7 @@ class Processing:
             value = ""
         return value
 
-    def generate_document(
+    def process_document(
         self,
         save_to: str,
         subject: str,
@@ -70,32 +67,35 @@ class Processing:
         cmk: str,
         tutor: str,
         date: list,
-        num_of_tickets: int | None,
+        tickets_count: int | None,
         qualify_status: bool | None,
-        status_cards_number: str,
-        status_rnd_theoretical: str,
-        status_rnd_practical: str,
-    ):
-        """Const generator for template and entrypoint"""
+        tickets_count_type: str,
+        theoretical_rnd_type: str,
+        practical_rnd_type: str,
+    ) -> None | str:
         logging.info(
             f"subject: {subject}\nspec: {spec}\ncmk: {cmk}\ntutor: {tutor}\ndate: {date}\n"
         )
 
-        # ОБНОВЛЕНИЕ ВОПРОСОВ
+        #  INFO: ОБНОВЛЕНИЕ ВОПРОСОВ
         self.questions_import()
 
-        if status_cards_number == "Manual" and num_of_tickets:
-            tickets = range(num_of_tickets)
-        elif status_cards_number == "Practical":
-            if self.practical_number_of_questions == 0:
+        match tickets_count_type:
+            case "Manual" if tickets_count is not None:
+                tickets = range(tickets_count)
+
+            case "Practical" if self.practical_questions_count <= 0:
                 return "Нету практических вопросов"
-            tickets = range(self.practical_number_of_questions)
-        elif status_cards_number == "Theoretical":
-            if self.theoretical_number_of_questions == 0:
+            case "Practical":
+                tickets = range(self.practical_questions_count)
+
+            case "Theoretical" if self.theoretical_questions_count <= 0:
                 return "Нету теоретических вопросов"
-            tickets = range(self.theoretical_number_of_questions)
-        else:
-            return "Неизвестная ошибка"
+            case "Theoretical":
+                tickets = range(self.theoretical_questions_count)
+
+            case _:
+                return "Неизвестная ошибка"
 
         day = date[2] or "__"
         month = date[1] or ""
@@ -131,163 +131,146 @@ class Processing:
             "day": rt_day,
             "month": rt_month,
             "year": year,
-            "ticket_num": "{{ticket_num}}",
-            "question_1": "{{question_1}}",
-            "question_2": "{{question_2}}",
         }
-
         tpl = DocxTemplate(self.PATH_BASE_DOC)
-        tpl.render(context)
-        tpl.save(self.tmp_base.name)
 
         if len(tickets) == 1:
-            i = tickets[0]
-
-            question_1 = self.get_selected_questions(
-                QuestionType.PRACTICAL, status_rnd_practical, i
+            tickets_count_num: int = tickets[0]
+            question_one = self.get_selected_questions(
+                QuestionType.PRACTICAL, practical_rnd_type, tickets_count_num
             )
-            question_2 = self.get_selected_questions(
-                QuestionType.THEORETICAL, status_rnd_theoretical, i
+            question_two = self.get_selected_questions(
+                QuestionType.THEORETICAL, theoretical_rnd_type, tickets_count_num
             )
-
-            tpl_single = DocxTemplate(self.tmp_base.name)
-            self.docx_save(
-                question_1=question_1,
-                question_2=question_2,
-                ticket_num=str(i + 1),
-                tmpfile=self.tmp_base,
-                tpl=tpl_single,
-            )
-            tpl_single.save(save_to)
+            context_extend = {
+                "ticket_num": str(tickets_count_num + 1),
+                "question_one": question_one,
+                "question_two": question_two,
+            }
+            context.update(context_extend)
+            tpl.render(context)
+            tpl.save(save_to)
             return
 
-        tmp_files = self.replace_questions(
-            status_rnd_practical=status_rnd_practical,
-            status_rnd_theoretical=status_rnd_theoretical,
-            tickets=tickets,
-        )
-        self.document_merge(tmp_files, save_to)
-
-    def docx_save(
-        self, question_1: str, question_2: str, ticket_num: str, tmpfile, tpl
-    ) -> None:
-        logging.info(f"Ticket {ticket_num}: Q1='{question_1}', Q2='{question_2}'")
-
-        context = {
-            "ticket_num": ticket_num,
-            "question_1": question_1,
-            "question_2": question_2,
+        context_extend = {
+            "ticket_num": "{{ticket_num}}",
+            "question_one": "{{question_one}}",
+            "question_two": "{{question_two}}",
         }
-
+        context.update(context_extend)
+        tmp_base = tempfile.NamedTemporaryFile(prefix="tmp_base_", suffix=".docx")
         tpl.render(context)
-        tpl.save(tmpfile.name)
+        tpl.save(tmp_base.name)
+        tmp_files = self.replace_questions(
+            status_rnd_practical=practical_rnd_type,
+            status_rnd_theoretical=theoretical_rnd_type,
+            tickets=tickets,
+            tpl_template_file=tmp_base,
+        )
+
+        self.docx_merge(tmp_files, save_to)
+        self.clean(path=tmp_base, paths=tmp_files)
 
     def get_selected_questions(
         self,
         question_type: QuestionType,
         status_rnd: str,
         question_index: int,
-    ):
+    ) -> str:
         if question_type == QuestionType.PRACTICAL:
             questions_list = self.practical_questions
         elif question_type == QuestionType.THEORETICAL:
             questions_list = self.theoretical_questions
 
-        if status_rnd == "always" and self.practical_questions:
-            question = str(random.choice(questions_list))
-        elif status_rnd == "fallback":
-            question = self.get_list_safe(questions_list, question_index, True)
-        elif status_rnd == "none":
-            question = self.get_list_safe(questions_list, question_index)
-        else:
-            question = ""
+        if questions_list is None:
+            return ""
 
-        return question
+        match status_rnd:
+            case "fallback":
+                question = self.get_list_safe(questions_list, question_index, True)
+            case "always":
+                question = random.choice(questions_list)
+            case "none":
+                question = self.get_list_safe(questions_list, question_index)
+            case _:
+                question = ""
+        return str(question)
 
     def replace_questions(
         self,
         status_rnd_practical: str,
         status_rnd_theoretical: str,
         tickets: range,
+        tpl_template_file: tempfile._TemporaryFileWrapper,
     ) -> list[tempfile._TemporaryFileWrapper]:
         """Replace questions"""
 
-        tpl = DocxTemplate(self.tmp_base.name)
+        tpl = DocxTemplate(tpl_template_file.name)
         tmpfiles = []
 
         for i in tickets:
-            temp_file_num = f"tmp_{i}"
-            tmpfile = tempfile.NamedTemporaryFile(prefix=temp_file_num, suffix=".docx")
-
-            question_1 = self.get_selected_questions(
+            tmpfile = tempfile.NamedTemporaryFile(prefix=f"tmp_{i}", suffix=".docx")
+            question_one = self.get_selected_questions(
                 QuestionType.PRACTICAL, status_rnd_practical, i
             )
-            question_2 = self.get_selected_questions(
+            question_two = self.get_selected_questions(
                 QuestionType.THEORETICAL, status_rnd_theoretical, i
             )
 
-            self.docx_save(
-                question_1=str(question_1),
-                question_2=str(question_2),
-                ticket_num=str(i + 1),
-                tmpfile=tmpfile,
-                tpl=tpl,
-            )
+            logging.info(f"Ticket {i+1}: Q1='{question_one}', Q2='{question_two}'")
+            context = {
+                "ticket_num": f"{i+1}",
+                "question_one": question_one,
+                "question_two": question_two,
+            }
+            tpl.render(context)
+            tpl.save(tmpfile.name)
             tmpfiles.append(tmpfile)
         return tmpfiles
 
-    def document_merge(
-        self,
-        tmp_paths: list[tempfile._TemporaryFileWrapper],
-        save_to: Optional[str] = None,
+    def docx_merge(
+        self, paths: list[tempfile._TemporaryFileWrapper], save_to: str
     ) -> None:
-        """Merge all temporary files and call cleaning of tmp files"""
-        master = Document(tmp_paths[0])
+        """Merge temporary files"""
+        master = Document(paths[0])
         composer = Composer(master)
 
         # master file page break
         master.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
-        for idx, tmp in enumerate(tmp_paths[1:], start=1):
+        for idx, tmp in enumerate(paths[1:], start=1):
             doc = Document(tmp.name)
             composer.append(doc)
-            if idx != len(tmp_paths) - 1:
+            if idx != len(paths) - 1:
                 master.add_page_break()
         composer.save(save_to)
-        self.cleaning(tmp_paths)
 
-    def cleaning(self, paths: list[tempfile._TemporaryFileWrapper]):
+    def clean(
+        self,
+        path: Optional[tempfile._TemporaryFileWrapper] = None,
+        paths: Optional[Iterable[tempfile._TemporaryFileWrapper]] = None,
+    ):
+        if path is None and paths is None:
+            return
+
+        all_paths = []
+        if path is not None:
+            all_paths.append(path)
+        if paths is not None:
+            all_paths.extend(paths)
+
         # clean temporary files
-        file_path = ""
-        for tmp_file in paths:
+        for file in all_paths:
             try:
-                file_path = tmp_file.name
-
+                file_path = file.name
                 # Deletes files on UNIX
                 # And makes sure it closes before deleting on non UNIX
-                if not tmp_file.closed:
-                    tmp_file.close()
+                if not file.closed:
+                    file.close()
                     logging.info(f"Closed temp file: {file_path}")
-
                 # Deletes files on non UNIX systems
                 if os.path.exists(file_path):
                     os.remove(file_path)
                     logging.info(f"Deleted temp file: {file_path}")
-
             except Exception as e:
-                logging.error(f"Failed to delete {file_path}: {e}")
-
-        # clean temporary base file
-        tmp_base_path = self.tmp_base.name
-        if os.path.exists(tmp_base_path):
-            try:
-                if not self.tmp_base.closed:
-                    logging.info(f"Closed temp base file: {tmp_base_path}")
-                    self.tmp_base.close()
-
-                if os.path.exists(tmp_base_path):
-                    os.remove(tmp_base_path)
-                    logging.info(f"Deleted temp file: {tmp_base_path}")
-
-            except Exception as e:
-                logging.error(f"Failed to delete {self.tmp_base.name}: {e}")
+                logging.error(f"Failed to delete {file.name}: {e}")
