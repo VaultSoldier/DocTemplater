@@ -22,6 +22,10 @@ class NoQuestionsError(DocxProcessingError):
     pass
 
 
+class InvalidNumberError(DocxProcessingError):
+    pass
+
+
 class UnknownTicketTypeError(DocxProcessingError):
     pass
 
@@ -101,6 +105,8 @@ class Processing:
         self.questions_import()
 
         match tickets_count_type:
+            case "Manual" if tickets_count is None or tickets_count <= 0:
+                raise InvalidNumberError("Неверное количество билетов")
             case "Practical" if self.practical_questions_count <= 0:
                 raise NoQuestionsError("Нету практических вопросов")
             case "Theoretical" if self.theoretical_questions_count <= 0:
@@ -172,7 +178,9 @@ class Processing:
             "question_two": "{{question_two}}",
         }
         context.update(context_extend)
-        tmp_base_docx_file = tempfile.NamedTemporaryFile(prefix="tmp_base_", suffix=".docx")
+        tmp_base_docx_file = tempfile.NamedTemporaryFile(
+            prefix="tmp_base_", suffix=".docx"
+        )
         tpl.render(context)
         tpl.save(tmp_base_docx_file.name)
         tmp_docx_files = self.replace_questions(
