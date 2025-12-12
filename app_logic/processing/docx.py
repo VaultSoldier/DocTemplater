@@ -1,6 +1,7 @@
 import os
 import logging
 import random
+import sys
 import tempfile
 import math
 from typing import Final, Iterable, List, Optional
@@ -36,6 +37,7 @@ class Processing:
             "assets/templates/base.docx"
         )
         self.sql = SqliteData()
+        self.is_windows = sys.platform.startswith("win")
 
         self.practical_questions: list[str] = []
         self.practical_questions_count: int = 0
@@ -178,9 +180,13 @@ class Processing:
             "question_two": "{{question_two}}",
         }
         context.update(context_extend)
+
         tmp_base_docx_file = tempfile.NamedTemporaryFile(
-            prefix="tmp_base_", suffix=".docx"
+            prefix="tmp_base_",
+            suffix=".docx",
+            delete=not self.is_windows,
         )
+
         tpl.render(context)
         tpl.save(tmp_base_docx_file.name)
         tmp_docx_files = self.replace_questions(
@@ -231,7 +237,9 @@ class Processing:
         tmpfiles = []
 
         for i in tickets:
-            tmpfile = tempfile.NamedTemporaryFile(prefix=f"tmp_{i}", suffix=".docx")
+            tmpfile = tempfile.NamedTemporaryFile(
+                prefix=f"tmp_{i}", suffix=".docx", delete=not self.is_windows
+            )
             question_one = self.get_selected_questions(
                 QuestionType.PRACTICAL, status_rnd_practical, i
             )
