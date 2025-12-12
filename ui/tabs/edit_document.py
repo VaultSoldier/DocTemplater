@@ -94,9 +94,26 @@ class TabEditDocument(MainUi):
         pass
 
     def on_change_date_picker(self, e):
+        MONTHS_RU_GEN = [
+            "",
+            "января",
+            "февраля",
+            "марта",
+            "апреля",
+            "мая",
+            "июня",
+            "июля",
+            "августа",
+            "сентября",
+            "октября",
+            "ноября",
+            "декабря",
+        ]
         date = e.control.value
-        formatted = f"{date.year}.{date.strftime('%B')}.{date.day}".split(".")
-        print(formatted)
+
+        formatted = f"{date.year}.{MONTHS_RU_GEN[date.month]}.{date.day}".split(".")
+        logging.info(formatted)
+
         self.date_row.value = formatted
         self.page.update()
 
