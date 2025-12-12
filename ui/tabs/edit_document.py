@@ -1,5 +1,4 @@
 import datetime as dt
-import time
 import logging
 
 import flet as ft
@@ -21,7 +20,7 @@ from ui.templates import (
 from config import config
 import locale
 
-locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
+locale.setlocale(locale.LC_ALL, "")
 
 
 class TabEditDocument(MainUi):

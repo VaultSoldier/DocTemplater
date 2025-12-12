@@ -22,7 +22,7 @@ import calendar
 from datetime import datetime, timedelta
 import datetime as dt
 
-locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
+locale.setlocale(locale.LC_ALL, "")
 
 
 # WARNING: Incomplete custom DatePicker widget
