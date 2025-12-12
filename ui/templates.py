@@ -115,7 +115,7 @@ class DateRow(ft.Container):
             content=ft.IconButton(
                 style=ft.ButtonStyle(
                     shape=ft.RoundedRectangleBorder(radius=9),
-                    bgcolor="#2c323e",
+                    bgcolor="",
                 ),
                 icon=ft.Icons.DATE_RANGE,
                 on_click=lambda _: page.open(date_picker),
