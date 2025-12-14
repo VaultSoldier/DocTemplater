@@ -288,10 +288,10 @@ class EditQuestionsTabController:
 
         if any(self.selected_rows_practical.values()):
             self.delete_question_by_type(QuestionType.PRACTICAL)
-            self.selected_rows_practical.update()
+            self.selected_rows_practical.update
         if any(self.selected_rows_theoretical.values()):
             self.delete_question_by_type(QuestionType.THEORETICAL)
-            self.selected_rows_theoretical.update()
+            self.selected_rows_theoretical.update
 
     def get_edit_questions_table(
         self, question_type: QuestionType
