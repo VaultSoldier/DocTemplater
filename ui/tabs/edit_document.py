@@ -203,7 +203,6 @@ class TabEditDocument(MainUi):
         tickets_count_type = str(next(iter(self.segmented_button_ticket_num.selected)))
         practical_rnd_type = str(next(iter(self.segmented_btn_practical.selected)))
         theoretical_rnd_type = str(next(iter(self.segmented_btn_theoretical.selected)))
-
         tickets_count = None
 
         if self.textfield_ticket_number.value:
