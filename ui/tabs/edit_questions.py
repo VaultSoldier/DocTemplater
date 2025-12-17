@@ -1,21 +1,22 @@
 import logging
 from typing import Any
-import re
 
 import flet as ft
 
-from app_logic.table import get_selected_questions
-from app_logic.processing.data_operations import (
+from app_logic.table import get_selected_row_questions
+from app_logic.processing.data import (
     SqliteData,
     TextProcessing,
+    clean_question_by_regex,
     docx_extract_questions,
 )
-from app_logic.processing.docx_creation import Processing
+from app_logic.processing.docx import Processing
 from app_logic.types import QuestionType
 from ui.templates import (
     Overlay,
     StyledAlertDialog,
     StyledButton,
+    StyledSegmentedButton,
     StyledTextField,
     WarnPopup,
 )
@@ -75,7 +76,7 @@ class EditQuestionsTabController:
         selected_rows.update({idx: False for idx in questions.keys()})
         table.rows = self.build_data_rows(questions, question_type)
 
-        self.page.update()
+        table.update()
         logging.info("Questions table refreshed")
 
     def toggle_row(
@@ -88,11 +89,12 @@ class EditQuestionsTabController:
         questions = self.sqlite.read_questions_dict(question_type)
 
         if question_type == QuestionType.PRACTICAL:
-            self.table_practical.rows = self.build_data_rows(questions, question_type)
+            table = self.table_practical
         elif question_type == QuestionType.THEORETICAL:
-            self.table_theoretical.rows = self.build_data_rows(questions, question_type)
+            table = self.table_theoretical
 
-        self.page.update()
+        table.rows = self.build_data_rows(questions, question_type)
+        table.update()
 
     def toggle_all(self, e, question_type: QuestionType):
         questions = self.sqlite.read_questions_dict(question_type)
@@ -110,7 +112,7 @@ class EditQuestionsTabController:
             selected[idx] = new_state
 
         table.rows = self.build_data_rows(questions, question_type)
-        self.page.update()
+        table.update()
 
     def on_pick(self, e: ft.FilePickerResultEvent, overlay: ft.Container):
         overlay.visible = False
@@ -128,11 +130,15 @@ class EditQuestionsTabController:
         logging.info(filepath)
 
         if filepath[-5:].lower() == ".docx":
-            filetype = "docx"
+            new_questions = docx_extract_questions(filepath)
         elif filepath[-4:].lower() == ".txt":
-            filetype = "txt"
+            new_questions = self.text_processing.get_dict(filepath)
         else:
             warning()
+            return
+
+        if not new_questions:
+            self.page.open(WarnPopup("В файле нету вопросов"))
             return
 
         # TODO: Доработать ПОПАП
@@ -140,12 +146,10 @@ class EditQuestionsTabController:
         button_theoretical = StyledButton("Теоретические")
 
         button_practical.on_click = (
-            lambda e, qtype=QuestionType.PRACTICAL: on_click_save_to(e, qtype, filetype)
+            lambda e, qtype=QuestionType.PRACTICAL: on_click_save_to(e, qtype)
         )
         button_theoretical.on_click = (
-            lambda e, qtype=QuestionType.THEORETICAL: on_click_save_to(
-                e, qtype, filetype
-            )
+            lambda e, qtype=QuestionType.THEORETICAL: on_click_save_to(e, qtype)
         )
 
         dialog_content = ft.Row(expand=True)
@@ -160,48 +164,73 @@ class EditQuestionsTabController:
         )
         self.page.open(dialog)
 
-        def on_click_save_to(e, qtype, filetype):
+        def on_click_save_to(e, qtype):
             button_practical.disabled = True
             button_theoretical.disabled = True
-            self.page.update()
-
-            if filetype == "docx":
-                new_questions = docx_extract_questions(filepath)
-            elif filetype == "txt":
-                new_questions = self.text_processing.get_dict(filepath)
-            else:
-                raise ValueError("Неправильный тип данных")
+            button_practical.update()
+            button_theoretical.update()
 
             self.sqlite.add_list(new_questions, qtype)
             self.refresh_table(self.sqlite.read_questions_dict(qtype), qtype)
             self.page.close(dialog)
 
-    # INFO: IMPLEMENT SAVING
     def on_click_open_textfield(self, e):
         textfield = ft.TextField(multiline=True, min_lines=10)
         button_save = StyledButton("Сохранить")
-        button_save.on_click = lambda _: prepare_and_submit()
+        button_save.on_click = lambda _: submit(segments_qtype.selected)
         button_close = StyledButton("Закрыть")
 
-        def prepare_and_submit(question_type):
-            REGEX_NUMBER_WITH_BRACKET = (
-                r"^\s*\d+[.)]{1,2}\s*"  # пример: 1) или 1. или 1.)
-            )
-            questions_raw = textfield.value
-
-            if not questions_raw:
+        # INFO: CAN BE OPTIMISED
+        def submit(question_type):
+            if not question_type or not textfield.value:
                 return
 
-            questions = [
-                question
+            REGEX = r"^\s*\d+[.)]{1,2}\s*"  # пример: 1) или 1. или 1.)
+            qtype = next(iter(question_type))
+            questions_raw = textfield.value
+
+            if qtype == QuestionType.PRACTICAL.value:
+                questions = self.questions_practical
+            elif qtype == QuestionType.THEORETICAL.value:
+                questions = self.questions_theoretical
+            else:
+                return
+
+            button_save.disabled = True
+            button_save.update()
+
+            values = [
+                cleaned
                 for q in questions_raw.splitlines()
-                if (
-                    question := re.sub(REGEX_NUMBER_WITH_BRACKET, "", q.strip()).strip()
-                )
-                != ""
+                if (cleaned := clean_question_by_regex(REGEX, q)) != ""
             ]
 
-            self.sqlite.add_list(questions, question_type)
+            if not any(values):
+                button_save.disabled = False
+                button_save.update()
+                return
+
+            self.sqlite.add_list(values, QuestionType(qtype))
+
+            questions.clear()
+            questions.update(self.sqlite.read_questions_dict(QuestionType(qtype)))
+            self.refresh_table(questions, QuestionType(qtype), refresh_questions=False)
+            logging.info(f"Сохранённые значения: {values}")
+            self.page.close(dialog)
+
+        segments_qtype = StyledSegmentedButton(selected={QuestionType.PRACTICAL.value})
+        segments_qtype.segments = [
+            ft.Segment(
+                expand=True,
+                value=QuestionType.PRACTICAL.value,
+                label=ft.Text("Практические"),
+            ),
+            ft.Segment(
+                expand=True,
+                value=QuestionType.THEORETICAL.value,
+                label=ft.Text("Теоретические"),
+            ),
+        ]
 
         dialog = StyledAlertDialog(
             modal=True,
@@ -209,16 +238,21 @@ class EditQuestionsTabController:
             title="Каждый вопрос должен быть на новой строке",
         )
         dialog.content = ft.Container(content=textfield)
-        dialog.actions = [ft.ResponsiveRow(controls=[button_save, button_close])]
+        dialog.actions = [
+            ft.Column(
+                [
+                    ft.Row([segments_qtype], expand=True),
+                    ft.Row(controls=[button_save, button_close]),
+                ]
+            ),
+        ]
 
         button_close.on_click = lambda _: self.page.close(dialog)
         self.page.open(dialog)
 
-    def on_click_upload_docx(
-        self, e, file_picker: ft.FilePicker, overlay: ft.Container
-    ):
+    def on_click_upload(self, e, file_picker: ft.FilePicker, overlay: ft.Container):
         overlay.visible = True
-        self.page.update()
+        overlay.update()
 
         file_picker.pick_files(
             allow_multiple=False,
@@ -248,16 +282,16 @@ class EditQuestionsTabController:
         if not any(self.selected_rows_practical.values()) and not any(
             self.selected_rows_theoretical.values()
         ):
-            logging.info("Вопросы не выбраны")
             self.page.open(WarnPopup("Вопрос(ы) не выбран(ы)"))
+            logging.info("Вопросы не выбраны")
             return
 
         if any(self.selected_rows_practical.values()):
             self.delete_question_by_type(QuestionType.PRACTICAL)
+            self.selected_rows_practical.update
         if any(self.selected_rows_theoretical.values()):
             self.delete_question_by_type(QuestionType.THEORETICAL)
-
-        self.page.update()
+            self.selected_rows_theoretical.update
 
     def get_edit_questions_table(
         self, question_type: QuestionType
@@ -273,7 +307,7 @@ class EditQuestionsTabController:
             questions_label = ft.Text("Теоретические Вопросы")
 
         questions = self.sqlite.read_questions_dict(question_type)
-        new_questions = get_selected_questions(questions, selected_rows)
+        new_questions = get_selected_row_questions(questions, selected_rows)
         textfield_storage: dict[int, str] = dict(new_questions)
         items_len = len(new_questions)
 
@@ -326,7 +360,7 @@ class EditQuestionsTabController:
         alert_dialog = StyledAlertDialog(
             modal=True,
             content=alert_dialog_content,
-            actions=[button_save, button_close],
+            actions=[ft.Row([button_save, button_close])],
         )
 
         # INFO: МОЖНО ОПТИМИЗИРОВАТЬ
@@ -401,14 +435,21 @@ class EditQuestionsTabController:
                     break
             self.page.update()
 
-        radio_group = ft.RadioGroup(ft.Text(), value="questions_practical")
-        radio_group.content = ft.Row(
-            expand=True,
-            controls=[
-                ft.Radio(value="questions_practical", label="Практические"),
-                ft.Radio(value="questions_theoretical", label="Теоретические"),
-            ],
-        )
+        segments_qtype = StyledSegmentedButton(selected={QuestionType.PRACTICAL.value})
+        segments_qtype.segments = [
+            ft.Segment(
+                expand=True,
+                value=QuestionType.PRACTICAL.value,
+                label=ft.Text("Практические"),
+                # icon=ft.Icon(ft.Icons.CHECK_BOX_OUTLINE_BLANK),
+            ),
+            ft.Segment(
+                expand=True,
+                value=QuestionType.THEORETICAL.value,
+                label=ft.Text("Теоретические"),
+                # icon=ft.Icon(ft.Icons.CHECK_BOX_OUTLINE_BLANK),
+            ),
+        ]
 
         # INFO: МОЖНО ОПТИМИЗИРОВАТЬ СОХРАНЕНИЕ ДАННЫХ
         def on_click_save(e):
@@ -417,15 +458,19 @@ class EditQuestionsTabController:
                 for textfield_data, _ in textfields
                 if textfield_data.value.strip()
             ]
-            if not values:
+            if not values or not segments_qtype.selected:
                 return
 
-            if radio_group.value == "questions_practical":
+            qtype = next(iter(segments_qtype.selected))
+
+            if qtype == QuestionType.PRACTICAL.value:
                 question_type = QuestionType.PRACTICAL
                 questions = self.questions_practical
-            else:
+            elif qtype == QuestionType.THEORETICAL.value:
                 question_type = QuestionType.THEORETICAL
                 questions = self.questions_theoretical
+            else:
+                return
 
             self.sqlite.add_list(values, question_type)
             questions.clear()
@@ -435,13 +480,13 @@ class EditQuestionsTabController:
             logging.info(f"Сохранённые значения: {values}")
             self.page.close(alert_layout)
 
-        button_add_row = StyledButton(text="Добавить", on_click=add_textfield)
+        button_add_row = StyledButton(text="Добавить поле", on_click=add_textfield)
         button_save = StyledButton(text="Сохранить", on_click=on_click_save)
         button_close = StyledButton(text="Закрыть")
 
         column_selections = ft.Column()
         column_selections.controls = [
-            radio_group,
+            ft.Row(expand=True, controls=[segments_qtype]),
             ft.Row(
                 controls=[button_add_row, button_save, button_close],
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -518,11 +563,10 @@ class TabEditQuestions(EditQuestionsTabController):
         overlay = Overlay()
         filepicker = ft.FilePicker(on_result=lambda e: self.on_pick(e, overlay))
         self.page.overlay.extend([overlay, filepicker])
-
         self.button_upload_docx = StyledButton(
             text=".DOCX или .TXT",
             icon=ft.Icons.FILE_UPLOAD,
-            on_click=lambda e: self.on_click_upload_docx(e, filepicker, overlay),
+            on_click=lambda e: self.on_click_upload(e, filepicker, overlay),
         )
 
     def get_data_table(self, question_type: QuestionType) -> ft.DataTable:

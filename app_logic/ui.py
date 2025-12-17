@@ -34,13 +34,6 @@ class MainUi:
             label_questions_list.visible = True
         page.update()
 
-    def validate(
-        self, e: ft.ControlEvent, page: ft.Page, button: ft.Button, *args: ft.TextField
-    ):
-        status = not any((arg.value or "").strip() for arg in args)
-        button.disabled = status
-        page.update()
-
 
 def open_file(filepath: str):
     try:

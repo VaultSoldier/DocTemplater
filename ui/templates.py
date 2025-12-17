@@ -1,10 +1,12 @@
-from typing import Callable, Iterable, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Set, Tuple, Union
+from babel.dates import format_date
 import flet as ft
 from flet import Blur, Control, InputFilter, OptionalNumber
 import datetime as dt
 import locale
 import calendar
 from flet.core.buttons import OutlinedBorder
+from flet.core.segmented_button import Segment
 from flet.core.types import (
     BorderRadiusValue,
     ColorValue,
@@ -21,7 +23,7 @@ class Overlay(ft.Container):
         self,
         text_value: Optional[str] = "Выберите файл...",
         text_size: OptionalNumber = 32,
-        text_color: Optional[ColorValue] = "white",
+        text_color: Optional[ColorValue] = "",
         content: Optional[Control] = None,
         bgcolor: Optional[ColorValue] = "dark",
         blend_mode=ft.BlendMode.OVERLAY,
@@ -47,10 +49,11 @@ class Overlay(ft.Container):
 
 # NOTE: DatePicker write on_change to date_controls_dict
 class DateRow(ft.Container):
-    locale.setlocale(category=locale.LC_TIME, locale="ru_RU.UTF-8")
-
     date_controls_dict = dict()
-    months_ = list(calendar.month_name)[1:]
+    months_ = [
+        format_date(dt.date(2025, i, 1), "MMMM", locale="ru")
+        for i in range(1, 13)  # "MMMM" = тип падежа
+    ]
     dt_format = "%Y,%B,%d,%H,%M"
 
     def __init__(
@@ -59,8 +62,7 @@ class DateRow(ft.Container):
         if (page.height or 0) > 575:
             self.menu_height = (page.height or 0) * 0.45
         else:
-            pass
-        self.dropdown_width = (page.width or 0) * 0.16
+            self.menu_height = None
 
         super().__init__()
         self.border = ft.border.all(1)
@@ -70,8 +72,13 @@ class DateRow(ft.Container):
         self.on_change = on_change or (lambda x: None)
         self.padding = 0
 
-        for attr in ["_years", "_months", "_days"]:
-            getattr(self, attr)(self.menu_height)
+        self._years()
+        self._months()
+
+        today = dt.date.today()
+        init_year = today.year
+        init_month = today.month
+        self._days(init_year, init_month)
 
         self.content = ft.Row(
             controls=[
@@ -90,9 +97,14 @@ class DateRow(ft.Container):
             expand=True,
         )
 
+        self.value = {
+            "years": str(init_year),
+            "months": self.months_[init_month - 1],
+            "days": str(today.day),
+        }
+
     def on_resize_change_height(self, height: float):
         height = height * 0.45
-
         for dd in self.date_controls_dict.values():
             dd.menu_height = height
             dd.update()
@@ -103,14 +115,14 @@ class DateRow(ft.Container):
             content=ft.IconButton(
                 style=ft.ButtonStyle(
                     shape=ft.RoundedRectangleBorder(radius=9),
-                    bgcolor="#2c323e",
+                    bgcolor="",
                 ),
                 icon=ft.Icons.DATE_RANGE,
                 on_click=lambda _: page.open(date_picker),
             ),
         )
 
-    def _years(self, menu_height) -> None:
+    def _years(self) -> None:
         year = dt.date.today().year
         years = list(map(str, range(year + 2, year - 21, -1)))
         self._dropdown(
@@ -118,29 +130,27 @@ class DateRow(ft.Container):
             elements=years,
             on_change=self._on_change,
             hint_text="Год",
-            menu_height=menu_height,
+            menu_height=self.menu_height,
         )
 
-    def _months(self, menu_height) -> None:
+    def _months(self) -> None:
         self._dropdown(
             name="months",
             elements=self.months_,
             on_change=self._on_change,
             hint_text="Месяц",
-            menu_height=menu_height,
+            menu_height=self.menu_height,
         )
 
-    def _days(
-        self, menu_height, year: int = dt.date.today().year, month: int = 1
-    ) -> None:
-        day = calendar.monthrange(year, month)[1]
-        days = range(1, day + 1)
+    def _days(self, year: int, month: int) -> None:
+        num_days = calendar.monthrange(year, month)[1]
+        days = list(map(str, range(1, num_days + 1)))
         self._dropdown(
             name="days",
             elements=days,
             on_change=self._on_change_wrapper,
             hint_text="День",
-            menu_height=menu_height,
+            menu_height=self.menu_height,
         )
 
     def _dropdown(self, name: str, elements: Iterable, **kwargs) -> None:
@@ -150,9 +160,8 @@ class DateRow(ft.Container):
         """
         self.date_controls_dict[name] = ft.Dropdown(
             options=[ft.dropdown.Option(x) for x in elements],
-            expand_loose=False,
-            filled=True,
             expand=True,
+            dense=True,
             **kwargs,
         )
 
@@ -161,18 +170,20 @@ class DateRow(ft.Container):
 
     def _on_change(self, e) -> None:
         self.on_change(self.value)
-        year = self.date_controls_dict["years"].value
-        month = self.date_controls_dict["months"].value
+        year = int(self.date_controls_dict["years"].value)
+        month = self.months_.index(self.date_controls_dict["months"].value) + 1
+        max_day = calendar.monthrange(year, month)[1]
+        days_dd = self.date_controls_dict["days"]
+        days_dd.options = [ft.dropdown.Option(str(d)) for d in range(1, max_day + 1)]
+        prev = days_dd.value
 
-        if year and month:
-            year = int(year)
-            month = self.months_.index(month) + 1
-            days = range(1, calendar.monthrange(year, month)[1] + 1)
+        try:
+            prev_int = int(prev) if prev is not None else max_day
+        except ValueError:
+            prev_int = max_day
+        days_dd.value = str(min(prev_int, max_day))
 
-            self.date_controls_dict["days"].options = [
-                ft.dropdown.Option(str(d)) for d in days
-            ]
-            self.page.update()
+        self.page.update()
 
     @property
     def value(self) -> list:
@@ -181,12 +192,72 @@ class DateRow(ft.Container):
     @value.setter
     def value(self, values: list | dict):
         if isinstance(values, list):
-            for control, val in zip(self.date_controls_dict.values(), values):
-                control.value = val
-        elif isinstance(values, dict):
-            for key, val in values.items():
-                self.date_controls_dict[key].value = val
+            year_val, month_val, day_val = values
+        else:
+            year_val = values.get("years")
+            month_val = values.get("months")
+            day_val = values.get("days")
+
+        years_dd = self.date_controls_dict["years"]
+        months_dd = self.date_controls_dict["months"]
+        days_dd = self.date_controls_dict["days"]
+
+        years_dd.value = year_val
+        months_dd.value = month_val
+
+        if not year_val or not month_val:
+            days_dd.options = []
+            days_dd.value = None
+            self.page.update()
+            return
+
+        try:
+            year = int(year_val)
+            month = self.months_.index(month_val) + 1
+        except ValueError:
+            days_dd.options = []
+            days_dd.value = None
+            self.page.update()
+            return
+
+        num_days = calendar.monthrange(year, month)[1]
+        opts = [ft.dropdown.Option(str(d)) for d in range(1, num_days + 1)]
+        days_dd.options = opts
+
+        if day_val is None:
+            days_dd.value = None
+            self.page.update()
+            return
+
+        try:
+            day_int = int(day_val)
+            days_dd.value = str(day_int) if 1 <= day_int <= num_days else None
+        except ValueError:
+            days_dd.value = None
         self.page.update()
+
+
+class StyledSegmentedButton(ft.SegmentedButton):
+    def __init__(
+        self,
+        segments: List[Segment] = [],
+        selected: Optional[Set] = None,
+        show_selected_icon: Optional[bool] = False,
+        expand: Union[None, bool, int] = True,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            segments=segments,
+            selected=selected,
+            show_selected_icon=show_selected_icon,
+            expand=expand,
+            *args,
+            **kwargs,
+        )
+
+        self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(6))
+        # selected_icon=ft.Icon(ft.Icons.CHECK_BOX_OUTLINED)
 
 
 class StyledButton(ft.Button):
@@ -195,22 +266,25 @@ class StyledButton(ft.Button):
         text: Optional[str] = None,
         height: OptionalNumber = 38,
         width: OptionalNumber = 160,
-        expand: (bool | int | None) = True,
+        expand: bool | int | None = True,
         icon: Optional[IconValue] = None,
         on_click: OptionalControlEventCallable = None,
         disabled: Optional[bool] = None,
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            text,
+            icon,
+            on_click=on_click,
+            disabled=disabled,
+            height=height,
+            width=width,
+            expand=expand,
+            *args,
+            **kwargs,
+        )
 
-        self.text = text
-        self.icon = icon
-        self.on_click = on_click
-        self.disabled = disabled
-        self.height = height
-        self.width = width
-        self.expand = expand
         self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=6))
 
 
@@ -229,17 +303,19 @@ class StyledTextField(ft.TextField):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-
-        self.label = label
-        self.hint_text = hint_text
-        self.input_filter = input_filter
-        self.border_color = border_color
-        self.border_radius = border_radius
-        self.max_length = max_length
-        self.expand = expand
-        self.suffix_icon = suffix_icon
-        self.on_change = on_change
+        super().__init__(
+            label=label,
+            hint_text=hint_text,
+            input_filter=input_filter,
+            border_color=border_color,
+            border_radius=border_radius,
+            max_length=max_length,
+            expand=expand,
+            suffix_icon=suffix_icon,
+            on_change=on_change,
+            *args,
+            **kwargs,
+        )
 
 
 class WarnPopup(ft.SnackBar):
@@ -276,7 +352,6 @@ class WarnPopup(ft.SnackBar):
 class StyledAlertDialog(ft.AlertDialog):
     def __init__(
         self,
-        # custom values
         shape: Optional[OutlinedBorder] = ft.RoundedRectangleBorder(radius=9),
         content_padding=ft.padding.only(left=14, right=14, top=14, bottom=0),
         actions_padding=ft.padding.only(left=14, right=14, top=4, bottom=14),
@@ -285,10 +360,12 @@ class StyledAlertDialog(ft.AlertDialog):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-
-        self.content_padding = content_padding
-        self.actions_padding = actions_padding
-        self.actions_alignment = actions_alignment
-        self.shape = shape
-        self.action_button_padding = action_button_padding
+        super().__init__(
+            shape=shape,
+            content_padding=content_padding,
+            actions_padding=actions_padding,
+            action_button_padding=action_button_padding,
+            actions_alignment=actions_alignment,
+            *args,
+            **kwargs,
+        )
