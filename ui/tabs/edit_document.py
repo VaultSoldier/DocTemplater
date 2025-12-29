@@ -1,4 +1,5 @@
 import datetime as dt
+import locale
 import logging
 
 import flet as ft
@@ -8,6 +9,7 @@ from app_logic import MainUi
 from app_logic.processing.docx import DocxProcessingError, Processing
 from app_logic.types import QuestionType
 from app_logic.ui import open_file
+from config import config
 from ui.templates import (
     DateRow,
     Overlay,
@@ -17,8 +19,6 @@ from ui.templates import (
     StyledTextField,
     WarnPopup,
 )
-from config import config
-import locale
 
 locale.setlocale(locale.LC_ALL, "")
 
@@ -68,16 +68,16 @@ class TabEditDocument(MainUi):
             on_change=self.on_change_date_row,
         )
 
-        overlay = Overlay(text_value="Сохрани документ...")
         filepicker = ft.FilePicker(on_result=lambda e: self.on_pick(e, overlay))
+        overlay = Overlay(text_value="Сохрани документ...")
         page.overlay.extend([overlay, filepicker])
 
-        self.button_submit = StyledButton(
+        self.button_create = StyledButton(
             text="Создать билет(ы)",
             disabled=True,
-            on_click=lambda e: self.on_click_button_submit(e, filepicker, overlay),
+            on_click=lambda e: self.on_click_button_create(e, filepicker, overlay),
         )
-        self.button_clear = StyledButton(text="Очистить поля")
+        self.button_clear_fields = StyledButton(text="Очистить поля")
 
         self.segmented_button_ticket_num = StyledSegmentedButton(
             selected={"Manual"}, expand=True
@@ -90,10 +90,10 @@ class TabEditDocument(MainUi):
         )
 
     # TODO: IMPLEMENT DATEPICKER CHANGE DATE ON DATEROW UPDATE
-    def on_change_date_row(self, e):
+    def on_change_date_row(self, e) -> None:
         pass
 
-    def on_change_date_picker(self, e):
+    def on_change_date_picker(self, e) -> None:
         MONTHS_RU_GEN = [
             "",
             "января",
@@ -117,7 +117,7 @@ class TabEditDocument(MainUi):
         self.date_row.value = formatted
         self.page.update()
 
-    def _textfield_clear(self, e):
+    def _textfield_clear(self, e) -> None:
         for field in (
             self.textfield_cmk,
             self.textfield_spec,
@@ -128,9 +128,9 @@ class TabEditDocument(MainUi):
             field.value = ""
         self.page.update()
 
-    def on_click_button_submit(
+    def on_click_button_create(
         self, e, filepicker: ft.FilePicker, overlay: ft.Container
-    ):
+    ) -> None:
         overlay.visible = True
         self.page.update()
 
@@ -147,7 +147,7 @@ class TabEditDocument(MainUi):
     def on_change_validate(
         self,
         e: ft.ControlEvent,
-    ):
+    ) -> None:
         textfields = (
             self.textfield_subject,
             self.textfield_spec,
@@ -163,14 +163,14 @@ class TabEditDocument(MainUi):
         else:
             status = not (filled_any and number_ok)
 
-        self.button_submit.disabled = status
-        self.button_submit.update()
+        self.button_create.disabled = status
+        self.button_create.update()
 
-    def on_pick(self, e: ft.FilePickerResultEvent, overlay: ft.Container):
+    def on_pick(self, e: ft.FilePickerResultEvent, overlay: ft.Container) -> None:
         if not e.path:
             overlay.visible = False
             self.page.update()
-            logging.info(f"Save path is None: {e.path}")
+            logging.info(f"Save path: {e.path}")
             return
 
         filepath: str = e.path
@@ -224,17 +224,13 @@ class TabEditDocument(MainUi):
             )
         except DocxProcessingError as error:
             logging.info(f"Error processing docx: {error}'")
-            overlay.visible = False
-            overlay.update()
-            overlay.content = Overlay().content
+            self.hide_overlay(overlay)
 
             self.page.open(WarnPopup(error))
             return
 
-        self.handle_generation_complete(filepath)
-        overlay.visible = False
-        overlay.update()
-        overlay.content = Overlay().content
+        self.show_dialog_generation_complete(filepath)
+        self.hide_overlay(overlay)
 
         if not response:
             return
@@ -243,7 +239,12 @@ class TabEditDocument(MainUi):
             lambda: self.docx_processing.clean(path=response[0], paths=response[1])
         )
 
-    def handle_generation_complete(self, filepath: str):
+    def hide_overlay(self, overlay: ft.Container) -> None:
+        overlay.visible = False
+        overlay.update()
+        overlay.content = Overlay().content
+
+    def show_dialog_generation_complete(self, filepath: str) -> None:
         dialog = StyledAlertDialog(
             title=ft.Text("Документ создан", text_align=ft.TextAlign.CENTER),
             alignment=ft.Alignment(0, 0),
@@ -269,7 +270,7 @@ class TabEditDocument(MainUi):
         self.page.open(dialog)
 
     def get_tab_ui(self) -> ft.Tab:
-        self.button_clear.on_click = self._textfield_clear
+        self.button_clear_fields.on_click = self._textfield_clear
 
         def on_segmented_change(e: ft.ControlEvent):
             if e.control.selected != {"Manual"}:
@@ -287,13 +288,20 @@ class TabEditDocument(MainUi):
             ft.Segment(
                 value="Manual",
                 label=ft.Text("Ввод"),
+                tooltip="Ручной ввод количества билетов",
                 expand=True,
             ),
             ft.Segment(
-                value="Practical", label=ft.Text("Из практических"), expand=True
+                value="Practical",
+                label=ft.Text("Из практических"),
+                tooltip="Количество билетов из количества практических вопросов",
+                expand=True,
             ),
             ft.Segment(
-                value="Theoretical", label=ft.Text("Из теоретических"), expand=True
+                value="Theoretical",
+                label=ft.Text("Из теоретических"),
+                tooltip="Количество билетов из количества теоретических вопросов",
+                expand=True,
             ),
         ]
 
@@ -422,8 +430,8 @@ class TabEditDocument(MainUi):
                 alignment=ft.MainAxisAlignment.CENTER,
                 expand=True,
                 controls=[
-                    self.button_submit,
-                    self.button_clear,
+                    self.button_create,
+                    self.button_clear_fields,
                 ],
             ),
         )
