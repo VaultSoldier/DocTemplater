@@ -1,28 +1,32 @@
-from typing import Callable, Iterable, List, Optional, Set, Tuple, Union
-from babel.dates import format_date
-import flet as ft
-from flet import Blur, Control, InputFilter, OptionalNumber
-import datetime as dt
-import locale
 import calendar
-from flet.core.buttons import OutlinedBorder
-from flet.core.segmented_button import Segment
-from flet.core.types import (
+import datetime as dt
+from typing import Callable, Iterable, List, Optional, Tuple, Union
+
+import flet as ft
+from babel.dates import format_date
+from flet import (
+    Alignment,
+    Blur,
     BorderRadiusValue,
     ColorValue,
-    IconValue,
-    IconValueOrControl,
-    OptionalControlEventCallable,
+    Control,
+    ControlEventHandler,
+    Icon,
+    IconDataOrControl,
+    InputFilter,
     MainAxisAlignment,
+    Number,
+    OutlinedBorder,
     PaddingValue,
+    Segment,
 )
 
 
 class Overlay(ft.Container):
     def __init__(
         self,
-        text_value: Optional[str] = "Выберите файл...",
-        text_size: OptionalNumber = 32,
+        text_value: str = "Выберите файл...",
+        text_size: Number = 32,
         text_color: Optional[ColorValue] = "",
         content: Optional[Control] = None,
         bgcolor: Optional[ColorValue] = "dark",
@@ -30,7 +34,7 @@ class Overlay(ft.Container):
         blur: Union[
             None, float, int, Tuple[Union[float, int], Union[float, int]], Blur
         ] = 10,
-        visible: Optional[bool] = False,
+        visible: bool = False,
         *args,
         **kwargs,
     ):
@@ -43,7 +47,7 @@ class Overlay(ft.Container):
         self.bgcolor = bgcolor
         self.blend_mode = blend_mode
         self.blur = blur
-        self.alignment = ft.alignment.center
+        self.alignment = Alignment.CENTER
         self.visible = visible
 
 
@@ -240,23 +244,23 @@ class DateRow(ft.Container):
 class StyledSegmentedButton(ft.SegmentedButton):
     def __init__(
         self,
+        selected: List[str],
+        show_selected_icon: bool = False,
         segments: List[Segment] = [],
-        selected: Optional[Set] = None,
-        show_selected_icon: Optional[bool] = False,
         expand: Union[None, bool, int] = True,
         *args,
         **kwargs,
     ):
         super().__init__(
-            segments=segments,
             selected=selected,
             show_selected_icon=show_selected_icon,
+            segments=segments,
             expand=expand,
             *args,
             **kwargs,
         )
 
-        self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(6))
+        self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=6))
         # selected_icon=ft.Icon(ft.Icons.CHECK_BOX_OUTLINED)
 
 
@@ -264,12 +268,12 @@ class StyledButton(ft.Button):
     def __init__(
         self,
         text: Optional[str] = None,
-        height: OptionalNumber = 38,
-        width: OptionalNumber = 160,
+        height: Optional[Number] = 38,
+        width: Optional[Number] = 160,
         expand: bool | int | None = True,
-        icon: Optional[IconValue] = None,
-        on_click: OptionalControlEventCallable = None,
-        disabled: Optional[bool] = None,
+        icon: Optional[IconDataOrControl] = None,
+        on_click: Optional[ControlEventHandler[ft.Button]] = None,
+        disabled: bool = False,
         *args,
         **kwargs,
     ):
@@ -298,8 +302,8 @@ class StyledTextField(ft.TextField):
         border_radius: Optional[BorderRadiusValue] = 1,
         max_length: Optional[int] = None,
         expand: Optional[bool | int] = None,
-        suffix_icon: Optional[IconValueOrControl] = None,
-        on_change: OptionalControlEventCallable = None,
+        icon: Optional[Icon] = None,
+        on_change: Optional[ControlEventHandler[ft.TextField]] = None,
         *args,
         **kwargs,
     ):
@@ -311,7 +315,7 @@ class StyledTextField(ft.TextField):
             border_radius=border_radius,
             max_length=max_length,
             expand=expand,
-            suffix_icon=suffix_icon,
+            icon=icon,
             on_change=on_change,
             *args,
             **kwargs,
