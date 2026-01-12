@@ -1,14 +1,16 @@
-import os
 import logging
+import math
+import os
 import random
 import sys
 import tempfile
-import math
 from typing import Final, Iterable, List, Optional
-from docx.enum.text import WD_BREAK
-from docxtpl import DocxTemplate, RichText
+
 from docx import Document
+from docx.enum.text import WD_BREAK
 from docxcompose.composer import Composer
+from docxtpl import DocxTemplate, RichText
+
 from app_logic.processing.data import SqliteData, get_resource_path_temp
 from app_logic.types import QuestionType
 
@@ -157,17 +159,17 @@ class Processing:
         tpl = DocxTemplate(self.PATH_BASE_DOC)
 
         if len(tickets) == 1:
-            tickets_count_num: int = tickets[0]
-            question_one = self.get_selected_questions(
-                QuestionType.PRACTICAL, practical_rnd_type, tickets_count_num
+            i: int = tickets[0]
+            question_theoretical = self.get_selected_questions(
+                QuestionType.THEORETICAL, theoretical_rnd_type, i
             )
-            question_two = self.get_selected_questions(
-                QuestionType.THEORETICAL, theoretical_rnd_type, tickets_count_num
+            question_practical = self.get_selected_questions(
+                QuestionType.PRACTICAL, practical_rnd_type, i
             )
             context_extend = {
-                "ticket_num": str(tickets_count_num + 1),
-                "question_one": question_one,
-                "question_two": question_two,
+                "ticket_num": str(i + 1),
+                "question_theoretical": question_theoretical,
+                "question_practical": question_practical,
             }
             context.update(context_extend)
             tpl.render(context)
@@ -176,8 +178,8 @@ class Processing:
 
         context_extend = {
             "ticket_num": "{{ticket_num}}",
-            "question_one": "{{question_one}}",
-            "question_two": "{{question_two}}",
+            "question_theoretical": "{{question_theoretical}}",
+            "question_practical": "{{question_practical}}",
         }
         context.update(context_extend)
 
@@ -238,19 +240,21 @@ class Processing:
 
         for i in tickets:
             tmpfile = tempfile.NamedTemporaryFile(
-                prefix=f"tmp_{i}", suffix=".docx", delete=not self.is_windows
+                prefix=f"tmp_{i}",
+                suffix=".docx",
+                delete=not self.is_windows,
             )
-            question_one = self.get_selected_questions(
-                QuestionType.PRACTICAL, status_rnd_practical, i
-            )
-            question_two = self.get_selected_questions(
+            question_theoretical = self.get_selected_questions(
                 QuestionType.THEORETICAL, status_rnd_theoretical, i
+            )
+            question_practical = self.get_selected_questions(
+                QuestionType.PRACTICAL, status_rnd_practical, i
             )
 
             context = {
-                "ticket_num": f"{i+1}",
-                "question_one": question_one,
-                "question_two": question_two,
+                "ticket_num": f"{i + 1}",
+                "question_theoretical": question_theoretical,
+                "question_practical": question_practical,
             }
             tpl.render(context)
             tpl.save(tmpfile.name)
