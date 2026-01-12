@@ -1,26 +1,27 @@
+import calendar
+import datetime as dt
 import locale
+from datetime import datetime, timedelta
 from typing import Callable, Optional
+
+import flet as ft
 from flet import (
     BorderSide,
     ButtonStyle,
+    Colors,
+    Column,
     Container,
     ControlEvent,
-    Column,
-    IconButton,
-    MainAxisAlignment,
     ControlState,
+    IconButton,
+    Icons,
+    MainAxisAlignment,
     RoundedRectangleBorder,
     Row,
     Text,
     TextButton,
-    Colors,
-    Icons,
 )
 from flet.core.types import DateTimeValue
-import flet as ft
-import calendar
-from datetime import datetime, timedelta
-import datetime as dt
 
 locale.setlocale(locale.LC_ALL, "")
 

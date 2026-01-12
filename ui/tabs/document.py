@@ -5,7 +5,6 @@ import logging
 import flet as ft
 from anyio import Path
 
-from app_logic import MainUi
 from app_logic.processing.docx import DocxProcessingError, Processing
 from app_logic.types import QuestionType
 from app_logic.ui import open_file
@@ -23,33 +22,42 @@ from ui.templates import (
 locale.setlocale(locale.LC_ALL, "")
 
 
-class TabEditDocument(MainUi):
-    def __init__(self, page: ft.Page, tab_label: ft.Text) -> None:
-        self.tab_label = tab_label
+class TabEditDocument:
+    def __init__(self, page: ft.Page) -> None:
         self.docx_processing = Processing()
         self.page = page
 
         self.textfield_subject = StyledTextField(
-            label="Предмет", max_length=180, on_change=self.on_change_validate
-        )
-        self.textfield_spec = StyledTextField(
-            label="Специальность", max_length=180, on_change=self.on_change_validate
-        )
-        self.textfield_cmk = StyledTextField(
-            label="Председатель ЦМK", max_length=180, on_change=self.on_change_validate
-        )
-        self.textfield_ticket_number = StyledTextField(
-            label="Количество билетов",
+            label="Предмет",
             on_change=self.on_change_validate,
-            max_length=3,
-            keyboard_type=ft.KeyboardType.NUMBER,
-            input_filter=ft.NumbersOnlyInputFilter(),
-            # border=ft.InputBorder.UNDERLINE,
             expand=True,
             dense=True,
+            max_length=180,
+            counter="",
+        )
+        self.textfield_spec = StyledTextField(
+            label="Специальность",
+            on_change=self.on_change_validate,
+            expand=True,
+            dense=True,
+            max_length=180,
+            counter="",
+        )
+        self.textfield_cmk = StyledTextField(
+            label="Председатель ЦМK",
+            on_change=self.on_change_validate,
+            expand=True,
+            dense=True,
+            max_length=180,
+            counter="",
         )
         self.textfield_tutor = StyledTextField(
-            label="Преподаватель", on_change=self.on_change_validate, expand=True
+            label="Преподаватель",
+            on_change=self.on_change_validate,
+            expand=True,
+            dense=True,
+            max_length=180,
+            counter="",
         )
 
         self.checkbox_qualifying = ft.Checkbox(label="Квалификационные билеты")
@@ -60,37 +68,76 @@ class TabEditDocument(MainUi):
             last_date=dt.date(year + 2, 12, 31),
             on_change=self.on_change_date_picker,
         )
-        page.overlay.append(self.date_picker)
+        self.page.overlay.append(self.date_picker)
 
         self.date_row = DateRow(
-            page=page,
+            page=self.page,
             date_picker=self.date_picker,
-            on_change=self.on_change_date_row,
+            on_select=self.on_select_date_row,
         )
 
-        filepicker = ft.FilePicker(on_result=lambda e: self.on_pick(e, overlay))
-        overlay = Overlay(text_value="Сохрани документ...")
-        page.overlay.extend([overlay, filepicker])
+        self.overlay = Overlay(text_value="Сохрани документ...")
+        self.page.overlay.append(self.overlay)
 
+        self.save_file_path = ""
         self.button_create = StyledButton(
             text="Создать билет(ы)",
             disabled=True,
-            on_click=lambda e: self.on_click_button_create(e, filepicker, overlay),
+            on_click=self.on_click_button_create,
         )
         self.button_clear_fields = StyledButton(text="Очистить поля")
 
+        self.textfield_ticket_number = StyledTextField(
+            label="Количество билетов",
+            on_change=self.on_change_validate,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            input_filter=ft.NumbersOnlyInputFilter(),
+            max_length=3,
+            counter="",
+            dense=True,
+        )
+
+        def on_segmented_change(e):
+            if e.control.selected != ["Manual"]:
+                self.textfield_ticket_number.disabled = True
+                self.textfield_ticket_number.update()
+                self.on_change_validate(e)
+                return
+
+            self.textfield_ticket_number.disabled = False
+            self.textfield_ticket_number.update()
+            self.on_change_validate(e)
+
         self.segmented_button_ticket_num = StyledSegmentedButton(
-            selected={"Manual"}, expand=True
+            on_change=on_segmented_change,
+            selected=["Manual"],
+            segments=[
+                ft.Segment(
+                    value="Manual",
+                    label=ft.Text("Ввод"),
+                    tooltip="Ручной ввод количества билетов",
+                ),
+                ft.Segment(
+                    value="Practical",
+                    label=ft.Text("Из практических"),
+                    tooltip="Количество билетов из количества практических вопросов",
+                ),
+                ft.Segment(
+                    value="Theoretical",
+                    label=ft.Text("Из теоретических"),
+                    tooltip="Количество билетов из количества теоретических вопросов",
+                ),
+            ],
         )
         self.segmented_btn_theoretical = StyledSegmentedButton(
-            expand=True, selected={"fallback"}
+            expand=True, selected=["fallback"]
         )
         self.segmented_btn_practical = StyledSegmentedButton(
-            expand=True, selected={"fallback"}
+            expand=True, selected=["fallback"]
         )
 
     # TODO: IMPLEMENT DATEPICKER CHANGE DATE ON DATEROW UPDATE
-    def on_change_date_row(self, e) -> None:
+    def on_select_date_row(self, e) -> None:
         pass
 
     def on_change_date_picker(self, e) -> None:
@@ -115,7 +162,7 @@ class TabEditDocument(MainUi):
         logging.info(formatted)
 
         self.date_row.value = formatted
-        self.page.update()
+        self.page.update
 
     def _textfield_clear(self, e) -> None:
         for field in (
@@ -126,23 +173,7 @@ class TabEditDocument(MainUi):
             self.textfield_ticket_number,
         ):
             field.value = ""
-        self.page.update()
-
-    def on_click_button_create(
-        self, e, filepicker: ft.FilePicker, overlay: ft.Container
-    ) -> None:
-        overlay.visible = True
-        self.page.update()
-
-        space = ""
-        if self.textfield_spec.value:
-            space = " по "
-
-        filepicker.save_file(
-            dialog_title="Сохранить файл",
-            allowed_extensions=["docx"],
-            file_name=f"Билеты промежуточной аттестации{space}{self.textfield_spec.value}.docx",
-        )
+        self.page.update
 
     def on_change_validate(
         self,
@@ -166,16 +197,30 @@ class TabEditDocument(MainUi):
         self.button_create.disabled = status
         self.button_create.update()
 
-    def on_pick(self, e: ft.FilePickerResultEvent, overlay: ft.Container) -> None:
-        if not e.path:
-            overlay.visible = False
-            self.page.update()
-            logging.info(f"Save path: {e.path}")
+    async def handle_save_file(self) -> str | None:
+        space = ""
+        if self.textfield_spec.value:
+            space = " по "
+
+        return await ft.FilePicker().save_file(
+            dialog_title="Сохранить файл",
+            allowed_extensions=["docx"],
+            file_name=f"Билеты промежуточной аттестации{space}{self.textfield_spec.value}.docx",
+        )
+
+    async def on_click_button_create(self, e: ft.Event[ft.Button]) -> None:
+        save_file_path = await self.handle_save_file()
+        self.overlay.visible = True
+        self.overlay.update()
+
+        if not save_file_path:
+            self.overlay.visible = False
+            self.page.update
+            logging.info(f"Save path: {save_file_path}")
             return
 
-        filepath: str = e.path
-        if filepath[-5:].lower() != ".docx":
-            filepath = f"{filepath}.docx"
+        if not save_file_path.lower().endswith(".docx"):
+            save_file_path = f"{save_file_path}.docx"
 
         text = ft.Text(
             "Документ создается...",
@@ -189,9 +234,9 @@ class TabEditDocument(MainUi):
         )
         loading_ui.controls = [text, ft.ProgressRing()]
 
-        overlay.content = loading_ui
-        overlay.visible = True
-        self.page.update()
+        self.overlay.content = loading_ui
+        self.overlay.visible = True
+        self.page.update
 
         if (
             not self.segmented_btn_theoretical.selected
@@ -210,7 +255,7 @@ class TabEditDocument(MainUi):
 
         try:
             response = self.docx_processing.process_docx(
-                save_to=filepath,
+                save_to=save_file_path,
                 subject=(self.textfield_subject.value or ""),
                 spec=(self.textfield_spec.value or ""),
                 cmk=(self.textfield_cmk.value or ""),
@@ -224,13 +269,13 @@ class TabEditDocument(MainUi):
             )
         except DocxProcessingError as error:
             logging.info(f"Error processing docx: {error}'")
-            self.hide_overlay(overlay)
+            self.hide_overlay(self.overlay)
 
-            self.page.open(WarnPopup(error))
+            self.page.show_dialog(WarnPopup(error))
             return
 
-        self.show_dialog_generation_complete(filepath)
-        self.hide_overlay(overlay)
+        self.show_dialog_generation_complete(save_file_path)
+        self.hide_overlay(self.overlay)
 
         if not response:
             return
@@ -263,47 +308,14 @@ class TabEditDocument(MainUi):
             StyledButton(
                 text="Закрыть",
                 expand=True,
-                on_click=lambda _: self.page.close(dialog),
+                on_click=lambda: self.page.pop_dialog(),
             ),
         ]
         dialog.actions = [responsive_row]
-        self.page.open(dialog)
+        self.page.show_dialog(dialog)
 
-    def get_tab_ui(self) -> ft.Tab:
+    def get_tab_ui(self) -> ft.Column:
         self.button_clear_fields.on_click = self._textfield_clear
-
-        def on_segmented_change(e: ft.ControlEvent):
-            if e.control.selected != {"Manual"}:
-                self.textfield_ticket_number.disabled = True
-                self.textfield_ticket_number.update()
-                self.on_change_validate(e)
-                return
-
-            self.textfield_ticket_number.disabled = False
-            self.textfield_ticket_number.update()
-            self.on_change_validate(e)
-
-        self.segmented_button_ticket_num.on_change = on_segmented_change
-        self.segmented_button_ticket_num.segments = [
-            ft.Segment(
-                value="Manual",
-                label=ft.Text("Ввод"),
-                tooltip="Ручной ввод количества билетов",
-                expand=True,
-            ),
-            ft.Segment(
-                value="Practical",
-                label=ft.Text("Из практических"),
-                tooltip="Количество билетов из количества практических вопросов",
-                expand=True,
-            ),
-            ft.Segment(
-                value="Theoretical",
-                label=ft.Text("Из теоретических"),
-                tooltip="Количество билетов из количества теоретических вопросов",
-                expand=True,
-            ),
-        ]
 
         def card_questions_num() -> ft.Card:
             column = ft.Column(
@@ -336,21 +348,21 @@ class TabEditDocument(MainUi):
             segmented_btn.segments = [
                 ft.Segment(
                     value="fallback",
-                    icon=ft.Icon("ROTATE_LEFT"),
+                    icon=ft.Icons.ROTATE_LEFT,
                     label=ft.Text("Случайные, если не хватает"),
                     tooltip="По порядку, а если не хватает — рандомизировать",
                     expand=True,
                 ),
                 ft.Segment(
                     value="always",
-                    icon=ft.Icon("SHUFFLE"),
+                    icon=ft.Icons.SHUFFLE,
                     label=ft.Text("Случайный порядок"),
                     tooltip="Всегда случайный вопрос",
                     expand=True,
                 ),
                 ft.Segment(
                     value="none",
-                    icon=ft.Icon("CLOSE"),
+                    icon=ft.Icons.CLOSE,
                     label=ft.Text("Не случайные"),
                     tooltip="Последовательный, не случайный порядок",
                     expand=True,
@@ -370,8 +382,8 @@ class TabEditDocument(MainUi):
             )
             return card
 
-        responsive_row_rnd = ft.ResponsiveRow(
-            spacing=5,
+        responsive_row_second = ft.ResponsiveRow(
+            spacing=0,
             expand=True,
             controls=[
                 ft.Column(
@@ -390,8 +402,8 @@ class TabEditDocument(MainUi):
         )
 
         responsive_row_textfields = ft.ResponsiveRow(
-            expand=True,
             alignment=ft.MainAxisAlignment.CENTER,
+            expand=True,
             controls=[
                 ft.Column(
                     col={"sm": 6},
@@ -419,16 +431,17 @@ class TabEditDocument(MainUi):
             controls=[
                 card_textfields,
                 number_of_questions,
-                responsive_row_rnd,
+                responsive_row_second,
             ],
             expand=True,
-            spacing=4,
         )
         tab_buttons = ft.Container(
-            margin=ft.margin.only(left=9, top=0, right=9, bottom=9),
+            margin=ft.Margin.only(left=9, top=6, right=9, bottom=9),
             content=ft.Row(
-                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=9,
                 expand=True,
+                margin=ft.Margin.all(0),
+                alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     self.button_create,
                     self.button_clear_fields,
@@ -436,17 +449,17 @@ class TabEditDocument(MainUi):
             ),
         )
 
-        tab = ft.Tab()
-        tab.tab_content = ft.Row(
-            alignment=ft.MainAxisAlignment.CENTER,
-            controls=[
-                ft.Icon(name=ft.Icons.EDIT_DOCUMENT, tooltip=self.tab_label.value),
-                self.tab_label,
-            ],
-        )
-        tab.content = ft.Column(
+        tab = ft.Column(
             expand=True,
             spacing=0,
-            controls=[ft.Container(tab_listview, expand=1, padding=9), tab_buttons],
+            controls=[
+                ft.Container(
+                    tab_listview,
+                    margin=ft.Margin.only(left=9, top=0, right=9, bottom=9),
+                    expand=1,
+                    padding=0,
+                ),
+                tab_buttons,
+            ],
         )
         return tab
