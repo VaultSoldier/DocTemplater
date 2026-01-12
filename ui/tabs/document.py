@@ -4,9 +4,9 @@ import logging
 
 import flet as ft
 from anyio import Path
-from app_logic.processing.docx import DocxProcessingError, Processing
-from app_logic.types import QuestionType
-from app_logic.ui import open_file
+from core.processing.docx import DocxProcessingError, Processing
+from core.types import QuestionType
+from core.ui import open_file
 
 from config import config
 from ui.templates import (

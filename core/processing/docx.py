@@ -11,8 +11,8 @@ from docx.enum.text import WD_BREAK
 from docxcompose.composer import Composer
 from docxtpl import DocxTemplate, RichText
 
-from app_logic.processing.data import SqliteData, get_resource_path_temp
-from app_logic.types import QuestionType
+from core.processing.data import SqliteData, get_resource_path_temp
+from core.types import QuestionType
 
 
 class DocxProcessingError(Exception):

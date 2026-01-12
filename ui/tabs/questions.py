@@ -3,15 +3,15 @@ from typing import Any, List
 
 import flet as ft
 
-from app_logic.processing.data import (
+from core.processing.data import (
     SqliteData,
     TextProcessing,
     clean_question_by_regex,
     docx_extract_questions,
 )
-from app_logic.processing.docx import Processing
-from app_logic.table import get_selected_row_questions
-from app_logic.types import QuestionType
+from core.processing.docx import Processing
+from core.table import get_selected_row_questions
+from core.types import QuestionType
 from ui.templates import (
     Overlay,
     StyledAlertDialog,

@@ -7,7 +7,7 @@ from typing import Any, Final
 from docx2python import docx2python
 from platformdirs import user_data_dir
 
-from app_logic.types import OrderType, QuestionType
+from core.types import OrderType, QuestionType
 
 APP_NAME: Final[str] = "DocTemplater"
 APP_AUTHOR: Final[str] = "SSK"
