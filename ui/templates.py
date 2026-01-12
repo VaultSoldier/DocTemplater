@@ -293,6 +293,7 @@ class StyledTextField(ft.TextField):
     def __init__(
         self,
         label: Optional[str | Control] = None,
+        label_style: Optional[ft.TextStyle] = None,
         hint_text: Optional[str] = None,
         input_filter: Optional[InputFilter] = None,
         border_color: Optional[ColorValue] = "#7799b8",
@@ -307,6 +308,7 @@ class StyledTextField(ft.TextField):
     ):
         super().__init__(
             label=label,
+            label_style=label_style,
             hint_text=hint_text,
             input_filter=input_filter,
             border_color=border_color,

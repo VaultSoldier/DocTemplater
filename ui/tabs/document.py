@@ -4,10 +4,10 @@ import logging
 
 import flet as ft
 from anyio import Path
-
 from app_logic.processing.docx import DocxProcessingError, Processing
 from app_logic.types import QuestionType
 from app_logic.ui import open_file
+
 from config import config
 from ui.templates import (
     DateRow,
@@ -114,18 +114,30 @@ class TabEditDocument:
             segments=[
                 ft.Segment(
                     value="Manual",
-                    label=ft.Text("Ввод"),
-                    tooltip="Ручной ввод количества билетов",
+                    label=ft.Text(
+                        "Ввод",
+                        overflow=ft.TextOverflow.FADE,
+                        no_wrap=True,
+                    ),
+                    tooltip="Ручной ввод",
                 ),
                 ft.Segment(
                     value="Practical",
-                    label=ft.Text("Из практических"),
-                    tooltip="Количество билетов из количества практических вопросов",
+                    label=ft.Text(
+                        "Из практических",
+                        overflow=ft.TextOverflow.FADE,
+                        no_wrap=True,
+                    ),
+                    tooltip="Сгенерировать столько билетов, сколько практических вопросов.",
                 ),
                 ft.Segment(
                     value="Theoretical",
-                    label=ft.Text("Из теоретических"),
-                    tooltip="Количество билетов из количества теоретических вопросов",
+                    label=ft.Text(
+                        "Из теоретических",
+                        overflow=ft.TextOverflow.FADE,
+                        no_wrap=True,
+                    ),
+                    tooltip="Сгенерировать столько билетов, сколько теоретических вопросов.",
                 ),
             ],
         )
@@ -348,22 +360,34 @@ class TabEditDocument:
             segmented_btn.segments = [
                 ft.Segment(
                     value="fallback",
-                    icon=ft.Icons.ROTATE_LEFT,
-                    label=ft.Text("Случайные, если не хватает"),
-                    tooltip="По порядку, а если не хватает — рандомизировать",
+                    icon=ft.Icons.AUTO_AWESOME,
+                    label=ft.Text(
+                        "Смешанный режим",
+                        overflow=ft.TextOverflow.FADE,
+                        no_wrap=True,
+                    ),
+                    tooltip="Не случайные, если закончились — случайные",
                     expand=True,
                 ),
                 ft.Segment(
                     value="always",
                     icon=ft.Icons.SHUFFLE,
-                    label=ft.Text("Случайный порядок"),
+                    label=ft.Text(
+                        "Случайные",
+                        overflow=ft.TextOverflow.FADE,
+                        no_wrap=True,
+                    ),
                     tooltip="Всегда случайный вопрос",
                     expand=True,
                 ),
                 ft.Segment(
                     value="none",
                     icon=ft.Icons.CLOSE,
-                    label=ft.Text("Не случайные"),
+                    label=ft.Text(
+                        "Не случайные",
+                        overflow=ft.TextOverflow.FADE,
+                        no_wrap=True,
+                    ),
                     tooltip="Последовательный, не случайный порядок",
                     expand=True,
                 ),
@@ -375,7 +399,14 @@ class TabEditDocument:
                 content=ft.Column(
                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                     controls=[
-                        ft.Text(label, weight=config.fontweight, size=config.fontsize),
+                        ft.Text(
+                            label,
+                            tooltip=label,
+                            weight=config.fontweight,
+                            size=config.fontsize,
+                            overflow=ft.TextOverflow.FADE,
+                            no_wrap=True,
+                        ),
                         segmented_btn,
                     ],
                 ),
