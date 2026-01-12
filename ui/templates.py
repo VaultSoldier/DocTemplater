@@ -92,7 +92,7 @@ class DateRow(ft.Container):
                 self.date_controls_dict["years"],
                 self.date_controls_dict["months"],
                 self.date_controls_dict["days"],
-                # self._calendar_button(date_picker),
+                self._calendar_button(date_picker),
             ],
             spacing=0,
         )
