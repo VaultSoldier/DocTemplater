@@ -32,21 +32,17 @@ class DocTemplater:
             tabs=[
                 ft.Row(
                     alignment=ft.MainAxisAlignment.CENTER,
+                    tooltip=text_tab_document.value,
                     controls=[
-                        ft.Icon(
-                            ft.Icons.EDIT_DOCUMENT,
-                            tooltip=text_tab_document.value,
-                        ),
+                        ft.Icon(ft.Icons.EDIT_DOCUMENT),
                         text_tab_document,
                     ],
                 ),
                 ft.Row(
                     alignment=ft.MainAxisAlignment.CENTER,
+                    tooltip=text_tab_questions.value,
                     controls=[
-                        ft.Icon(
-                            ft.Icons.NOTES,
-                            tooltip=text_tab_questions.value,
-                        ),
+                        ft.Icon(ft.Icons.NOTES),
                         text_tab_questions,
                     ],
                 ),
