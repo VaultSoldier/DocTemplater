@@ -111,15 +111,14 @@ class DateRow(ft.Container):
     #         dd.update()
 
     def _calendar_button(self, date_picker):
-        return ft.Container(
-            content=ft.IconButton(
-                style=ft.ButtonStyle(
-                    shape=ft.RoundedRectangleBorder(radius=9),
-                    bgcolor="",
-                ),
-                icon=ft.Icons.DATE_RANGE,
-                on_click=lambda _: self._page.show_dialog(date_picker),
+        return ft.IconButton(
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=9),
+                bgcolor="",
             ),
+            height=38,
+            icon=ft.Icons.DATE_RANGE,
+            on_click=lambda _: self._page.show_dialog(date_picker),
         )
 
     def _years(self) -> None:
