@@ -181,6 +181,7 @@ dependencies = [
     { name = "docxcompose" },
     { name = "docxtpl" },
     { name = "flet", extra = ["all"] },
+    { name = "flet-datatable2" },
     { name = "platformdirs" },
 ]
 
@@ -191,6 +192,7 @@ requires-dist = [
     { name = "docxcompose", specifier = ">=1.4.0" },
     { name = "docxtpl", specifier = ">=0.20.2" },
     { name = "flet", extras = ["all"], specifier = ">=0.80.1" },
+    { name = "flet-datatable2", specifier = ">=0.80.1" },
     { name = "platformdirs", specifier = ">=4.5.1" },
 ]
 
@@ -287,6 +289,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/90/3f/2cb7c8d7c280d281b9009651d40c36d33a423b37a1c81b66a4fba52b6827/flet_cli-0.80.1.tar.gz", hash = "sha256:99272fa8e210be15b147f299a73115dcc5f0c8f8ab508187cd9f89bb7b367d7d", size = 44453, upload-time = "2026-01-02T21:40:35.756Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/e3/5d88706146964520ca6a092bec7e6162fe755ebc2093d67995faa395d939/flet_cli-0.80.1-py3-none-any.whl", hash = "sha256:943069a0ef3f4bc69c9bcae53f8f07aa137c5a4d2a80f8dd14be9c671bc9a064", size = 56672, upload-time = "2026-01-02T21:40:34.769Z" },
+]
+
+[[package]]
+name = "flet-datatable2"
+version = "0.80.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flet" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e7/74/d837f8dbc6701a6eed97b43efd4e7f9718bdc0e5834287b00e9d2a1f76a8/flet_datatable2-0.80.1.tar.gz", hash = "sha256:f9a6bbf06c48dae081b8f11c396f41c5143efbf684d38b37b1d21bb1abfab28b", size = 22424, upload-time = "2026-01-02T21:41:50.732Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/7e/77d7974e76837f0c9adbac2cad056fd4ab6e11ed5cafd254c892bab7bc8c/flet_datatable2-0.80.1-py3-none-any.whl", hash = "sha256:2080d10aeb1763f2248ffb687507820936afd47dac15fad0f5c50a02182a3a4f", size = 24633, upload-time = "2026-01-02T21:41:49.818Z" },
 ]
 
 [[package]]
