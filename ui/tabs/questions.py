@@ -118,7 +118,7 @@ class EditQuestionsTabController:
     def on_click_open_textfield(self, e):
         textfield = ft.TextField(multiline=True, min_lines=10)
         button_save = StyledButton("Сохранить")
-        button_save.on_click = lambda _: submit(segments_qtype.selected)
+        button_save.on_click = lambda _: submit(segments_questions_type.selected)
         button_close = StyledButton("Закрыть")
 
         # INFO: CAN BE OPTIMISED
@@ -159,8 +159,10 @@ class EditQuestionsTabController:
             logging.info(f"Сохранённые значения: {values}")
             self.page.pop_dialog()
 
-        segments_qtype = StyledSegmentedButton(selected=[QuestionType.PRACTICAL.value])
-        segments_qtype.segments = [
+        segments_questions_type = StyledSegmentedButton(
+            selected=[QuestionType.PRACTICAL.value]
+        )
+        segments_questions_type.segments = [
             ft.Segment(
                 expand=True,
                 value=QuestionType.PRACTICAL.value,
@@ -182,7 +184,7 @@ class EditQuestionsTabController:
         dialog.actions = [
             ft.Column(
                 [
-                    ft.Row([segments_qtype], expand=True),
+                    ft.Row([segments_questions_type], expand=True),
                     ft.Row(controls=[button_save, button_close]),
                 ]
             ),
@@ -362,15 +364,15 @@ class EditQuestionsTabController:
         else:
             width = 0
 
-        alert_dialog_content = ft.Column(
+        dialog_content = ft.Column(
             width=width,
             spacing=0,
             expand=True,
             controls=[ft.Container(expand=True, content=table_content)],
         )
-        alert_dialog = StyledAlertDialog(
+        dialog = StyledAlertDialog(
             modal=True,
-            content=alert_dialog_content,
+            content=dialog_content,
             actions=[ft.Row([button_save, button_close])],
         )
 
@@ -404,7 +406,7 @@ class EditQuestionsTabController:
         ):
             fillout_qestions(QuestionType.PRACTICAL)
             fillout_qestions(QuestionType.THEORETICAL)
-            alert_dialog_content.width = width * 1.4
+            dialog_content.width = width * 1.4
         elif any(self.selected_rows_practical.values()):
             fillout_qestions(QuestionType.PRACTICAL)
         elif self.selected_rows_theoretical.values():
@@ -412,7 +414,7 @@ class EditQuestionsTabController:
 
         button_save.on_click = lambda e: on_click_button_save(tables_data, e)
         button_close.on_click = self.page.pop_dialog
-        self.page.show_dialog(alert_dialog)
+        self.page.show_dialog(dialog)
 
     def on_click_button_add(self, e):
         textfields = []
