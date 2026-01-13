@@ -4,11 +4,11 @@ import logging
 
 import flet as ft
 from anyio import Path
+
+from config import config
 from core.processing.docx import DocxProcessingError, Processing
 from core.types import QuestionType
 from core.ui import open_file
-
-from config import config
 from ui.templates import (
     DateRow,
     Overlay,
@@ -221,9 +221,9 @@ class TabEditDocument:
         )
 
     async def on_click_button_create(self, e: ft.Event[ft.Button]) -> None:
-        save_file_path = await self.handle_save_file()
         self.overlay.visible = True
         self.overlay.update()
+        save_file_path = await self.handle_save_file()
 
         if not save_file_path:
             self.overlay.visible = False
@@ -320,7 +320,7 @@ class TabEditDocument:
             StyledButton(
                 text="Закрыть",
                 expand=True,
-                on_click=lambda: self.page.pop_dialog(),
+                on_click=self.page.pop_dialog,
             ),
         ]
         dialog.actions = [responsive_row]
