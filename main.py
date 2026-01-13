@@ -1,8 +1,9 @@
-import flet as ft
-from ui.tabs.edit_document import TabEditDocument
-from ui.tabs.edit_questions import TabEditQuestions
-from app_logic import MainUi
 import logging
+
+import flet as ft
+
+from ui.tabs.document import TabEditDocument
+from ui.tabs.questions import TabEditQuestions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -11,42 +12,78 @@ logging.basicConfig(
 )
 
 
-class DocTemplater(MainUi):
+class DocTemplater:
     def __init__(self, page: ft.Page) -> None:
         super().__init__()
         self.page: ft.Page = page
 
     def init_ui(self):
-        label_edit_document = ft.Text(
-            value="Данные документа",
-        )
-        label_edit_questions = ft.Text(
-            value="Списки вопросов",
-        )
+        text_tab_document = ft.Text("Данные документа")
+        text_tab_questions = ft.Text("Списки вопросов")
 
-        tab_edit_document = TabEditDocument(self.page, label_edit_document)
-        tab_edit_questions = TabEditQuestions(self.page, label_edit_questions)
+        tab_edit_document = TabEditDocument(page=self.page)
+        tab_edit_questions = TabEditQuestions(self.page)
 
-        tabs = ft.Tabs(
+        tab_bar = ft.TabBar(
             label_text_style=ft.TextStyle(size=14),
-            selected_index=0,
-            animation_duration=80,
-            divider_height=1.70,
             scrollable=False,
-            expand=True,
+            divider_height=1,
+            margin=0,
             tabs=[
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    tooltip=text_tab_document.value,
+                    controls=[
+                        ft.Icon(ft.Icons.EDIT_DOCUMENT),
+                        text_tab_document,
+                    ],
+                ),
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    tooltip=text_tab_questions.value,
+                    controls=[
+                        ft.Icon(ft.Icons.NOTES),
+                        text_tab_questions,
+                    ],
+                ),
+            ],
+        )
+
+        tab_bar_view = ft.TabBarView(
+            margin=0,
+            expand=True,
+            controls=[
                 tab_edit_document.get_tab_ui(),
                 tab_edit_questions.get_tab_ui(),
             ],
         )
-
-        self.page.on_resized = lambda e: self.on_resize(
-            e,
-            tab_edit_document.date_row,
-            self.page,
-            label_edit_document,
-            label_edit_questions,
+        tabs = ft.Tabs(
+            margin=0,
+            length=2,
+            expand=True,
+            selected_index=0,
+            animation_duration=80,
+            content=ft.Column([tab_bar, tab_bar_view]),
         )
+
+        def on_resize():
+            width = self.page.width
+            height = self.page.height
+
+            if not height or not width:
+                return
+
+            # tab_edit_document.date_row.on_resize_change_height(height)
+
+            if width < 575:
+                text_tab_document.visible = False
+                text_tab_questions.visible = False
+            else:
+                text_tab_document.visible = True
+                text_tab_questions.visible = True
+            self.page.update()
+
+        self.page.on_resize = on_resize
 
         return tabs
 
@@ -70,4 +107,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main, assets_dir="assets")
+    ft.run(main=main, assets_dir="assets")

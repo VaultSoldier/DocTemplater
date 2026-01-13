@@ -8,4 +8,4 @@ class Config:
     fontweight: ft.FontWeight
 
 
-config = Config(fontsize=16, fontweight=ft.FontWeight.BOLD)
+config = Config(fontsize=16, fontweight=ft.FontWeight.NORMAL)
