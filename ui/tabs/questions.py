@@ -176,7 +176,7 @@ class EditQuestionsTabController:
         dialog = StyledAlertDialog(
             modal=True,
             actions_padding=ft.Padding.only(left=14, right=14, top=12, bottom=14),
-            title="Каждый вопрос должен быть на новой строке",
+            title="На один вопрос — одна строка",
         )
         dialog.content = ft.Container(content=textfield)
         dialog.actions = [
@@ -188,7 +188,7 @@ class EditQuestionsTabController:
             ),
         ]
 
-        button_close.on_click = lambda _: self.page.pop_dialog()
+        button_close.on_click = self.page.pop_dialog
         self.page.show_dialog(dialog)
 
     async def handle_pick_file(self) -> List[ft.FilePickerFile] | None:
@@ -411,7 +411,7 @@ class EditQuestionsTabController:
             fillout_qestions(QuestionType.THEORETICAL)
 
         button_save.on_click = lambda e: on_click_button_save(tables_data, e)
-        button_close.on_click = lambda _: self.page.pop_dialog()
+        button_close.on_click = self.page.pop_dialog
         self.page.show_dialog(alert_dialog)
 
     def on_click_button_add(self, e):
@@ -510,7 +510,7 @@ class EditQuestionsTabController:
             controls=[list_view, column_selections],
         )
 
-        button_close.on_click = lambda _: self.page.pop_dialog()
+        button_close.on_click = self.page.pop_dialog
         self.page.show_dialog(alert_layout)
 
 
