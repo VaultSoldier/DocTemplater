@@ -42,7 +42,11 @@ class Overlay(ft.Container):
         super().__init__(*args, **kwargs)
 
         text = ft.Text(
-            text_value, size=text_size, color=text_color, weight=ft.FontWeight.BOLD
+            text_value,
+            text_align=ft.TextAlign.CENTER,
+            weight=ft.FontWeight.BOLD,
+            size=text_size,
+            color=text_color,
         )
         self.content = content or text
         self.bgcolor = bgcolor
