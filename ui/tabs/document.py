@@ -81,11 +81,11 @@ class TabEditDocument:
 
         self.save_file_path = ""
         self.button_create = StyledButton(
-            text="Создать билет(ы)",
+            content="Создать билет(ы)",
             disabled=True,
             on_click=self.on_click_button_create,
         )
-        self.button_clear_fields = StyledButton(text="Очистить поля")
+        self.button_clear_fields = StyledButton(content="Очистить поля")
 
         self.textfield_ticket_number = StyledTextField(
             label="Количество билетов",
@@ -309,16 +309,16 @@ class TabEditDocument:
         responsive_row = ft.ResponsiveRow()
         responsive_row.controls = [
             StyledButton(
-                text="Открыть файл",
+                content="Открыть файл",
                 expand=True,
                 on_click=lambda e: open_file(filepath),
             ),
             StyledButton(
-                text="Открыть папку",
+                content="Открыть папку",
                 on_click=lambda e: open_file(str(Path(filepath).parent)),
             ),
             StyledButton(
-                text="Закрыть",
+                content="Закрыть",
                 expand=True,
                 on_click=self.page.pop_dialog,
             ),
@@ -329,7 +329,7 @@ class TabEditDocument:
     def get_tab_ui(self) -> ft.Column:
         self.button_clear_fields.on_click = self._textfield_clear
 
-        def card_questions_num() -> ft.Card:
+        def get_card_questions() -> ft.Card:
             column = ft.Column(
                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                 controls=[
@@ -337,19 +337,15 @@ class TabEditDocument:
                     self.segmented_button_ticket_num,
                 ],
             )
-            container = ft.Container(
-                padding=12,
-                content=column,
+            card = ft.Card(
+                content=ft.Container(
+                    padding=12,
+                    content=column,
+                )
             )
-            return ft.Card(content=container)
+            return card
 
-        number_of_questions = ft.Column(
-            controls=[
-                card_questions_num(),
-            ]
-        )
-
-        def rnd_card(question_type: QuestionType) -> ft.Card:
+        def get_segment_rnd(question_type: QuestionType) -> ft.Container:
             if question_type == QuestionType.PRACTICAL:
                 label = "Рандомизация теоретических вопросов"
                 segmented_btn = self.segmented_btn_practical
@@ -393,41 +389,50 @@ class TabEditDocument:
                 ),
             ]
 
-            card = ft.Card()
-            card.content = ft.Container(
-                padding=12,
-                content=ft.Column(
-                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=[
-                        ft.Text(
-                            label,
-                            tooltip=label,
-                            weight=config.fontweight,
-                            size=config.fontsize,
-                            overflow=ft.TextOverflow.FADE,
-                            no_wrap=True,
-                        ),
-                        segmented_btn,
-                    ],
-                ),
+            card = ft.Container(padding=12)
+            card.content = ft.Column(
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                margin=0,
+                controls=[
+                    ft.Text(
+                        label,
+                        tooltip=label,
+                        weight=config.fontweight,
+                        size=config.fontsize,
+                        overflow=ft.TextOverflow.FADE,
+                        no_wrap=True,
+                    ),
+                    segmented_btn,
+                ],
             )
             return card
 
-        responsive_row_second = ft.ResponsiveRow(
-            spacing=0,
+        cards_rnd = ft.ResponsiveRow(
             expand=True,
+            run_spacing=0,
+            spacing=0,
             controls=[
                 ft.Column(
-                    col={"xs": 12, "sm": 6},
                     expand=True,
+                    col={"xs": 12, "sm": 6},
                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=[rnd_card(QuestionType.PRACTICAL)],
+                    controls=[
+                        ft.Card(
+                            content=get_segment_rnd(QuestionType.PRACTICAL),
+                        )
+                    ],
                 ),
                 ft.Column(
-                    col={"xs": 12, "sm": 6},
                     expand=True,
+                    col={"xs": 12, "sm": 6},
                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=[rnd_card(QuestionType.THEORETICAL)],
+                    controls=[
+                        ft.Card(
+                            content=get_segment_rnd(
+                                QuestionType.THEORETICAL,
+                            ),
+                        )
+                    ],
                 ),
             ],
         )
@@ -451,23 +456,25 @@ class TabEditDocument:
         card_textfields = ft.Card(
             content=ft.Container(
                 padding=12,
-                content=ft.Column(
-                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=[responsive_row_textfields],
-                ),
-            )
+                content=responsive_row_textfields,
+            ),
         )
 
-        tab_listview = ft.ListView(
-            controls=[
-                card_textfields,
-                number_of_questions,
-                responsive_row_second,
-            ],
+        main_content = ft.Container(
+            margin=ft.Margin.all(6),
             expand=True,
+            padding=0,
+            content=ft.ListView(
+                expand=True,
+                controls=[
+                    card_textfields,
+                    get_card_questions(),
+                    cards_rnd,
+                ],
+            ),
         )
         tab_buttons = ft.Container(
-            margin=ft.Margin.only(left=9, top=6, right=9, bottom=9),
+            margin=ft.Margin.only(left=9, top=0, right=9, bottom=9),
             content=ft.Row(
                 spacing=9,
                 expand=True,
@@ -483,14 +490,6 @@ class TabEditDocument:
         tab = ft.Column(
             expand=True,
             spacing=0,
-            controls=[
-                ft.Container(
-                    tab_listview,
-                    margin=ft.Margin.only(left=9, top=0, right=9, bottom=9),
-                    expand=1,
-                    padding=0,
-                ),
-                tab_buttons,
-            ],
+            controls=[main_content, tab_buttons],
         )
         return tab
