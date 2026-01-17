@@ -62,8 +62,8 @@ class DocTemplater:
             length=2,
             expand=True,
             selected_index=0,
-            animation_duration=80,
-            content=ft.Column([tab_bar, tab_bar_view]),
+            animation_duration=50,
+            content=ft.Column(spacing=0, controls=[tab_bar, tab_bar_view]),
         )
 
         def on_resize():
