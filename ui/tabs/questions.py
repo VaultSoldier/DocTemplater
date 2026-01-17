@@ -1,7 +1,8 @@
 import logging
-from typing import Any, List
+from typing import Any, List, Optional
 
 import flet as ft
+import flet_datatable2 as fdt
 
 from core.processing.data import (
     SqliteData,
@@ -26,8 +27,8 @@ class EditQuestionsTabController:
     def __init__(
         self,
         page: ft.Page,
-        table_practical: ft.DataTable,
-        table_theoretical: ft.DataTable,
+        table_practical: fdt.DataTable2,
+        table_theoretical: fdt.DataTable2,
         _build_data_rows,
     ) -> None:
         self.page = page
@@ -80,37 +81,39 @@ class EditQuestionsTabController:
         table.update()
         logging.info("Questions table refreshed")
 
-    def toggle_row(
+    def toggle_rows(
         self,
-        question_id: int,
-        selected_rows: dict[int, bool],
+        e,
         question_type: QuestionType,
+        question_id: Optional[int] = None,
     ) -> None:
-        selected_rows[question_id] = not selected_rows[question_id]
+        """Toggles one row by id or ALL rows if no id is provided"""
         questions = self.sqlite.read_questions_dict(question_type)
 
-        if question_type == QuestionType.PRACTICAL:
-            table = self.table_practical
-        elif question_type == QuestionType.THEORETICAL:
-            table = self.table_theoretical
+        table_map = {
+            QuestionType.PRACTICAL: (
+                self.selected_rows_practical,
+                self.table_practical,
+            ),
+            QuestionType.THEORETICAL: (
+                self.selected_rows_theoretical,
+                self.table_theoretical,
+            ),
+        }
 
-        table.rows = self.build_data_rows(questions, question_type)
-        table.update()
+        try:
+            selected, table = table_map[question_type]
+        except KeyError:
+            raise ValueError(f"Unsupported question type: {question_type}")
 
-    def toggle_all(self, e, question_type: QuestionType):
-        questions = self.sqlite.read_questions_dict(question_type)
-
-        if question_type == QuestionType.PRACTICAL:
-            selected = self.selected_rows_practical
-            table = self.table_practical
-        elif question_type == QuestionType.THEORETICAL:
-            selected = self.selected_rows_theoretical
-            table = self.table_theoretical
-
-        new_state = not any(selected.values())
-
-        for idx in selected:
-            selected[idx] = new_state
+        if question_id is not None:
+            if question_id not in selected:
+                raise ValueError(f"Unkown question_id: {question_id}")
+            selected[question_id] = not selected[question_id]
+        else:
+            new_state = not any(selected.values())
+            for idx in selected:
+                selected[idx] = new_state
 
         table.rows = self.build_data_rows(questions, question_type)
         table.update()
@@ -185,7 +188,7 @@ class EditQuestionsTabController:
             ft.Column(
                 [
                     ft.Row([segments_questions_type], expand=True),
-                    ft.Row(controls=[button_save, button_close]),
+                    ft.Row([button_save, button_close]),
                 ]
             ),
         ]
@@ -308,7 +311,7 @@ class EditQuestionsTabController:
 
     def get_edit_questions_table(
         self, question_type: QuestionType
-    ) -> tuple[ft.DataTable, dict[int, str]]:
+    ) -> tuple[fdt.DataTable2, dict[int, str]]:
         """
         Возвращает DataTable и вопросы в dict[id, вопрос]
         """
@@ -322,42 +325,53 @@ class EditQuestionsTabController:
         questions = self.sqlite.read_questions_dict(question_type)
         new_questions = get_selected_row_questions(questions, selected_rows)
         textfield_storage: dict[int, str] = dict(new_questions)
-        items_len = len(new_questions)
 
-        data_table = ft.DataTable(
-            border=ft.Border(),
+        data_table = fdt.DataTable2(
             show_bottom_border=True,
+            heading_row_color=ft.Colors.SURFACE_CONTAINER,
+            sort_column_index=0,
+            column_spacing=26,
+            horizontal_margin=12,
+            heading_row_height=40,
+            data_row_height=38,
             columns=[
-                ft.DataColumn(label=ft.Text("№"), numeric=True),
-                ft.DataColumn(label=questions_label),
+                fdt.DataColumn2(
+                    fixed_width=30,
+                    heading_row_alignment=ft.MainAxisAlignment.START,
+                    label=ft.Text("№", overflow=ft.TextOverflow.FADE, no_wrap=True),
+                    numeric=True,
+                ),
+                fdt.DataColumn2(label=questions_label),
             ],
         )
-        data_table.rows = []
 
         def on_textfield_change(e):
             textfield_storage[e.control.data] = e.control.value
 
         for cell_index, (question_id, question) in enumerate(new_questions.items()):
-            reversed_cell_id = items_len - cell_index
-
-            tf = StyledTextField(
+            teftfield = StyledTextField(
                 border=ft.InputBorder.UNDERLINE,
                 data=question_id,
                 on_change=on_textfield_change,
                 value=question,
+                height=38,
+                content_padding=ft.Padding(0, -9),  # vertical center
             )
             data_table.rows.append(
-                ft.DataRow(
-                    cells=[ft.DataCell(ft.Text(str(reversed_cell_id))), ft.DataCell(tf)]
+                fdt.DataRow2(
+                    cells=[
+                        ft.DataCell(ft.Text(str(cell_index + 1))),
+                        ft.DataCell(teftfield),
+                    ],
                 )
             )
         return data_table, textfield_storage
 
     def on_click_button_edit(self, e):
         tables_data = {}
-        table_content = ft.Row()
-        button_save = StyledButton(text="Сохранить")
-        button_close = StyledButton(text="Закрыть")
+        table_content = ft.Row(expand=True)
+        button_save = StyledButton(content="Сохранить")
+        button_close = StyledButton(content="Закрыть")
 
         if self.page.width:
             width = self.page.width * 0.50
@@ -368,7 +382,7 @@ class EditQuestionsTabController:
             width=width,
             spacing=0,
             expand=True,
-            controls=[ft.Container(expand=True, content=table_content)],
+            controls=[table_content],
         )
         dialog = StyledAlertDialog(
             modal=True,
@@ -491,9 +505,9 @@ class EditQuestionsTabController:
             logging.info(f"Сохранённые значения: {values}")
             self.page.pop_dialog()
 
-        button_add_row = StyledButton(text="Добавить поле", on_click=add_textfield)
-        button_save = StyledButton(text="Сохранить", on_click=on_click_save)
-        button_close = StyledButton(text="Закрыть")
+        button_add_row = StyledButton(content="Добавить поле", on_click=add_textfield)
+        button_save = StyledButton(content="Сохранить", on_click=on_click_save)
+        button_close = StyledButton(content="Закрыть")
 
         column_selections = ft.Column()
         column_selections.controls = [
@@ -545,26 +559,26 @@ class TabEditQuestions(EditQuestionsTabController):
             height=38,
             width=160,
             expand=2,
-            text="Удалить",
+            content="Удалить",
             on_click=self.on_click_button_delete,
         )
         self.button_add = StyledButton(
             height=38,
             width=160,
             expand=2,
-            text="Добавить",
+            content="Добавить",
             on_click=self.on_click_button_add,
         )
         self.button_edit = StyledButton(
             height=38,
             width=160,
             expand=2,
-            text="Изменить",
+            content="Изменить",
             on_click=self.on_click_button_edit,
         )
 
         self.button_paste = StyledButton(
-            text="Вставить",
+            content="Вставить",
             icon=ft.Icons.PASTE,
             on_click=self.on_click_open_textfield,
         )
@@ -572,20 +586,50 @@ class TabEditQuestions(EditQuestionsTabController):
         self.page.overlay.append(self.overlay)
 
         self.button_upload_docx = StyledButton(
-            text=".DOCX или .TXT",
+            content="Загрузить",
             icon=ft.Icons.FILE_UPLOAD,
             on_click=self.on_click_button_upload,
         )
 
-    def get_data_table(self, question_type: QuestionType) -> ft.DataTable:
-        data_table = ft.DataTable(
-            expand=True,
-            vertical_lines=ft.BorderSide(1, ft.Colors.INVERSE_PRIMARY),
-            horizontal_lines=ft.BorderSide(1, "dark"),
+    def get_data_table(self, question_type: QuestionType) -> fdt.DataTable2:
+        if question_type == QuestionType.PRACTICAL:
+            label_question_type = ft.Text(
+                "Практические", overflow=ft.TextOverflow.FADE, no_wrap=True
+            )
+        elif question_type == QuestionType.THEORETICAL:
+            label_question_type = ft.Text(
+                "Теоретические", overflow=ft.TextOverflow.FADE, no_wrap=True
+            )
+
+        data_table = fdt.DataTable2(
             show_checkbox_column=True,
-            on_select_all=lambda e: self.toggle_all(e, question_type),
+            on_select_all=lambda e: self.toggle_rows(e, question_type),
+            heading_row_color=ft.Colors.SURFACE_CONTAINER,
+            sort_column_index=0,
+            column_spacing=26,
+            horizontal_margin=12,
+            heading_row_height=40,
+            data_row_height=38,
+            expand=True,
+            # empty=ft.Shimmer(
+            #     base_color=ft.Colors.with_opacity(0.3, ft.Colors.GREY_400),
+            #     highlight_color=ft.Colors.WHITE,
+            #     content=ft.Column(
+            #         controls=[
+            #             ft.Container(height=80, bgcolor=ft.Colors.GREY_300),
+            #         ],
+            #     ),
+            # ),
             columns=[
-                ft.DataColumn(label=ft.Text("№"), numeric=True),
+                fdt.DataColumn2(
+                    fixed_width=30,
+                    heading_row_alignment=ft.MainAxisAlignment.START,
+                    label=ft.Text("№", overflow=ft.TextOverflow.FADE, no_wrap=True),
+                    numeric=True,
+                ),
+                fdt.DataColumn2(
+                    label=label_question_type,
+                ),
             ],
             rows=self._build_data_rows(
                 questions_dict=self.sqlite.read_questions_dict(question_type),
@@ -593,73 +637,60 @@ class TabEditQuestions(EditQuestionsTabController):
             ),
         )
 
-        if question_type == QuestionType.PRACTICAL:
-            data_table.columns.append(
-                ft.DataColumn(label=ft.Text("Практические Вопросы"))
-            )
-        if question_type == QuestionType.THEORETICAL:
-            data_table.columns.append(
-                ft.DataColumn(label=ft.Text("Теоретические Вопросы"))
-            )
         return data_table
 
     def _build_data_rows(
         self, questions_dict: dict[int, Any], question_type: QuestionType
-    ) -> list[ft.DataRow]:
+    ) -> list[ft.DataRow | fdt.DataRow2]:
         items = questions_dict.items()
-        items_len = len(items)
         rows: list[ft.DataRow] = []
 
-        for cell_index, (question_id, question) in enumerate(items):
-            reversed_cell_id = items_len - cell_index
+        for index, (question_id, question) in enumerate(items):
+            cell_index = ft.Text(str(index + 1))
             cell_question = ft.Text(value=str(question), tooltip=str(question))
 
-            row_cells = [
-                ft.DataCell(ft.Text(str(reversed_cell_id))),
-                ft.DataCell(cell_question),
-            ]
-            row = ft.DataRow(row_cells, data=question_id)
+            row = fdt.DataRow2(
+                cells=[
+                    ft.DataCell(cell_index),
+                    ft.DataCell(cell_question),
+                ],
+                data=question_id,
+            )
+
+            row.on_select_change = lambda e, rid=question_id: self.toggle_rows(
+                e,
+                question_type=question_type,
+                question_id=rid,
+            )
 
             if question_type == QuestionType.PRACTICAL:
-                row.on_select_change = lambda e, rid=question_id: self.toggle_row(
-                    rid, self.selected_rows_practical, question_type
-                )
-                row.selected = self.selected_rows_practical.get(question_id) or False
+                selected_dict = self.selected_rows_practical
             elif question_type == QuestionType.THEORETICAL:
-                row.on_select_change = lambda e, rid=question_id: self.toggle_row(
-                    rid, self.selected_rows_theoretical, question_type
-                )
-                row.selected = self.selected_rows_theoretical.get(question_id) or False
+                selected_dict = self.selected_rows_theoretical
+
+            row.selected = selected_dict.get(question_id, False)
             rows.append(row)
         return rows
 
     def get_tab_ui(self):
         datatables = ft.Row(
+            spacing=9,
             expand=True,
             controls=[
                 ft.ListView(expand=True, controls=[self.table_practical]),
                 ft.ListView(expand=True, controls=[self.table_theoretical]),
             ],
         )
-        buttons = ft.Row(alignment=ft.MainAxisAlignment.CENTER)
-        buttons.controls = [
-            self.button_add,
-            self.button_edit,
-            self.button_delete,
-            self.button_paste,
-            self.button_upload_docx,
-        ]
-
-        tab = ft.Column(
-            expand=True,
-            spacing=0,
+        buttons = ft.Row(
+            margin=ft.Margin.all(9),
+            alignment=ft.MainAxisAlignment.CENTER,
             controls=[
-                datatables,
-                ft.Container(
-                    margin=ft.Margin.all(9),
-                    content=buttons,
-                ),
+                self.button_add,
+                self.button_edit,
+                self.button_delete,
+                self.button_paste,
+                self.button_upload_docx,
             ],
         )
-
+        tab = ft.Column([datatables, buttons])
         return tab

@@ -267,7 +267,8 @@ class StyledSegmentedButton(ft.SegmentedButton):
 class StyledButton(ft.Button):
     def __init__(
         self,
-        text: Optional[str] = None,
+        content: Optional[ft.StrOrControl] = None,
+        tooltip: ft.TooltipValue | None = None,
         height: Optional[Number] = 36,
         width: Optional[Number] = 160,
         expand: bool | int | None = True,
@@ -278,8 +279,9 @@ class StyledButton(ft.Button):
         **kwargs,
     ):
         super().__init__(
-            text,
-            icon,
+            content=content,
+            tooltip=tooltip,
+            icon=icon,
             on_click=on_click,
             disabled=disabled,
             height=height,
