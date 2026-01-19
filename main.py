@@ -21,7 +21,7 @@ class DocTemplater:
         text_tab_document = ft.Text("Данные документа")
         text_tab_questions = ft.Text("Списки вопросов")
 
-        tab_edit_document = TabEditDocument(page=self.page)
+        tab_edit_document = TabEditDocument(self.page)
         tab_edit_questions = TabEditQuestions(self.page)
 
         tab_bar = ft.TabBar(
@@ -73,8 +73,10 @@ class DocTemplater:
             if not height or not width:
                 return
 
-            # tab_edit_document.date_row.on_resize_change_height(height)
+            # Alert table width
+            tab_edit_questions.dialog_content_edit_questions.width = width * 0.75
 
+            # Hide tab label
             if width < 575:
                 text_tab_document.visible = False
                 text_tab_questions.visible = False

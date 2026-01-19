@@ -51,6 +51,7 @@ class EditQuestionsTabController:
             idx: False for idx in self.questions_theoretical.keys()
         }
 
+        self.dialog_content_edit_questions = ft.Column(expand=True, spacing=0)
         self.table_practical = table_practical
         self.table_theoretical = table_theoretical
         self.overlay = Overlay()
@@ -252,7 +253,8 @@ class EditQuestionsTabController:
         )
 
         dialog_content = ft.Row(
-            controls=[button_practical, button_theoretical], expand=True
+            expand=True,
+            controls=[button_practical, button_theoretical],
         )
         dialog = ft.AlertDialog(
             title=ft.Text("Документ создан", text_align=ft.TextAlign.CENTER),
@@ -317,10 +319,19 @@ class EditQuestionsTabController:
         """
         if question_type == QuestionType.PRACTICAL:
             selected_rows = self.selected_rows_practical
-            questions_label = ft.Text("Практические Вопросы")
+            questions_label = ft.Text(
+                "Практические",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            )
+
         elif question_type == QuestionType.THEORETICAL:
             selected_rows = self.selected_rows_theoretical
-            questions_label = ft.Text("Теоретические Вопросы")
+            questions_label = ft.Text(
+                "Теоретические",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            )
 
         questions = self.sqlite.read_questions_dict(question_type)
         new_questions = get_selected_row_questions(questions, selected_rows)
@@ -374,19 +385,16 @@ class EditQuestionsTabController:
         button_close = StyledButton(content="Закрыть")
 
         if self.page.width:
-            width = self.page.width * 0.50
+            width = self.page.width * 0.75
         else:
-            width = 0
+            width = None
 
-        dialog_content = ft.Column(
-            width=width,
-            spacing=0,
-            expand=True,
-            controls=[table_content],
-        )
+        self.dialog_content_edit_questions.controls = [table_content]
+        self.dialog_content_edit_questions.width = width
+
         dialog = StyledAlertDialog(
             modal=True,
-            content=dialog_content,
+            content=self.dialog_content_edit_questions,
             actions=[ft.Row([button_save, button_close])],
         )
 
@@ -420,7 +428,6 @@ class EditQuestionsTabController:
         ):
             fillout_qestions(QuestionType.PRACTICAL)
             fillout_qestions(QuestionType.THEORETICAL)
-            dialog_content.width = width * 1.4
         elif any(self.selected_rows_practical.values()):
             fillout_qestions(QuestionType.PRACTICAL)
         elif self.selected_rows_theoretical.values():
