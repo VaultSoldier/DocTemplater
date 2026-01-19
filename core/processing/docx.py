@@ -1,5 +1,4 @@
 import logging
-import math
 import os
 import random
 import sys
@@ -9,7 +8,7 @@ from typing import Final, Iterable, List, Optional
 from docx import Document
 from docx.enum.text import WD_BREAK
 from docxcompose.composer import Composer
-from docxtpl import DocxTemplate, RichText
+from docxtpl import DocxTemplate
 
 from core.processing.data import SqliteData, get_resource_path_temp
 from core.types import QuestionType
@@ -84,10 +83,10 @@ class Processing:
     def process_docx(
         self,
         save_to: str,
-        subject: str,
-        spec: str,
-        cmk: str,
-        tutor: str,
+        subject: Optional[str],
+        spec: Optional[str],
+        cmk: Optional[str],
+        tutor: Optional[str],
         date: list,
         tickets_count: int | None,
         qualify_status: bool | None,
@@ -128,23 +127,18 @@ class Processing:
                     f"Неизвестный тип билетов: {tickets_count_type}"
                 )
 
+        TOTAL_CMK_WIDTH: Final[int] = 23
+
+        if cmk and cmk.strip():
+            cmk_padding = "_" * (TOTAL_CMK_WIDTH - len(str(cmk)))
+            cmk = f"{cmk_padding}{cmk}"
+        else:
+            cmk = "_" * (TOTAL_CMK_WIDTH - 9)
+
         qualify = " (квалификационный)" if qualify_status else ""
         day = f"{int(date[2]):02}" or "__"  # add "0" to single num (1 = 01, 10 = 10)
         month = date[1] or ""
         year = date[0] or ""
-
-        rt_day = RichText()
-        rt_month = RichText()
-        rt_day.add(day, underline=True)
-
-        total_width = 16
-        padding = total_width - len(str(month))
-        left_pad = " " * (padding // 2)
-        right_pad = " " * math.ceil(padding / 2)
-
-        rt_month.add(left_pad)
-        rt_month.add(month, underline="thick", bold=True)  # type: ignore[assignment]
-        rt_month.add(right_pad)
 
         context = {
             "qualify": qualify,
@@ -152,8 +146,8 @@ class Processing:
             "spec": spec,
             "cmk": cmk,
             "tutor": tutor,
-            "day": rt_day,
-            "month": rt_month,
+            "day": day,
+            "month": month,
             "year": year,
         }
         tpl = DocxTemplate(self.PATH_BASE_DOC)
