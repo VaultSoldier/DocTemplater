@@ -73,6 +73,9 @@ class DocTemplater:
             if not height or not width:
                 return
 
+            # date_row dropdown's height
+            tab_edit_document.date_row.on_resize_change_height(height)
+
             # Alert table width
             tab_edit_questions.dialog_content_edit_questions.width = width * 0.75
 

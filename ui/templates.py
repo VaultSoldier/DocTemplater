@@ -70,11 +70,10 @@ class DateRow(ft.Container):
     ) -> None:
         self._page = page
 
-        # INFO: Enable for ft.Dropdown()
-        # if (ft.Page.height or 0) > 575:
-        #     self.menu_height = (ft.Page.height or 0) * 0.45
-        # else:
-        #     self.menu_height = None
+        if (ft.Page.height or 0) > 575:
+            self.menu_height = (ft.Page.height or 0) * 0.45
+        else:
+            self.menu_height = None
 
         super().__init__()
         self.border = ft.Border.all(1, color="#7799b8")
@@ -107,12 +106,11 @@ class DateRow(ft.Container):
             "days": str(today.day),
         }
 
-    # INFO: Enable for ft.Dropdown()
-    # def on_resize_change_height(self, height: float):
-    #     height = height * 0.45
-    #     for dd in self.date_controls_dict.values():
-    #         dd.menu_height = height
-    #         dd.update()
+    def on_resize_change_height(self, height: float):
+        height = height * 0.45
+        for dd in self.date_controls_dict.values():
+            dd.menu_height = height
+            dd.update()
 
     def _calendar_button(self, date_picker):
         return ft.IconButton(
@@ -132,8 +130,8 @@ class DateRow(ft.Container):
             name="years",
             hint_text="Год",
             elements=years,
-            on_change=self._on_change,
-            # max_menu_height=self.menu_height,
+            on_select=self._on_select,
+            menu_height=self.menu_height,
         )
 
     def _months(self) -> None:
@@ -141,8 +139,8 @@ class DateRow(ft.Container):
             name="months",
             hint_text="Месяц",
             elements=self.months_,
-            on_change=self._on_change,
-            # max_menu_height=self.menu_height,
+            on_select=self._on_select,
+            menu_height=self.menu_height,
         )
 
     def _days(self, year: int, month: int) -> None:
@@ -152,8 +150,8 @@ class DateRow(ft.Container):
             name="days",
             hint_text="День",
             elements=days,
-            on_change=self._on_change,
-            # max_menu_height=self.menu_height,
+            on_select=self._on_select,
+            menu_height=self.menu_height,
         )
 
     def _dropdown(self, name: str, elements: Iterable, **kwargs) -> None:
@@ -161,17 +159,16 @@ class DateRow(ft.Container):
         Transform list to "ft.dropdown.Option"
         list and add my components list.
         """
-        self.date_controls_dict[name] = ft.DropdownM2(
-            options=[ft.dropdownm2.Option(x) for x in elements],
-            # menu_style=ft.MenuStyle(visual_density=ft.VisualDensity.COMPACT),
+        self.date_controls_dict[name] = ft.Dropdown(
+            options=[ft.dropdown.Option(x) for x in elements],
+            menu_style=ft.MenuStyle(padding=0, visual_density=ft.VisualDensity.COMPACT),
             height=38,
-            item_height=36,
             expand=True,
-            # dense=True,
+            dense=True,
             **kwargs,
         )
 
-    def _on_change(self, e) -> None:
+    def _on_select(self, e) -> None:
         self.on_select(self.value)
         year = int(self.date_controls_dict["years"].value)
         month = self.months_.index(self.date_controls_dict["months"].value) + 1
