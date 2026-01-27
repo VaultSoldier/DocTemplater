@@ -121,9 +121,25 @@ class EditQuestionsTabController:
 
     def on_click_open_textfield(self, e):
         textfield = ft.TextField(multiline=True, min_lines=10)
-        button_save = StyledButton("Сохранить")
+        button_save = StyledButton(
+            tooltip="Сохранить",
+            icon=ft.Icons.SAVE,
+            content=ft.Text(
+                value="Сохранить",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            ),
+        )
         button_save.on_click = lambda _: submit(segments_questions_type.selected)
-        button_close = StyledButton("Закрыть")
+        button_close = StyledButton(
+            tooltip="Закрыть",
+            icon=ft.Icons.CLOSE,
+            content=ft.Text(
+                value="Закрыть",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            ),
+        )
 
         # INFO: CAN BE OPTIMISED
         def submit(question_type):
@@ -381,8 +397,14 @@ class EditQuestionsTabController:
     def on_click_button_edit(self, e):
         tables_data = {}
         table_content = ft.Row(expand=True)
-        button_save = StyledButton(content="Сохранить")
-        button_close = StyledButton(content="Закрыть")
+        button_save = StyledButton(
+            content="Сохранить",
+            icon=ft.Icons.SAVE,
+        )
+        button_close = StyledButton(
+            content="Закрыть",
+            icon=ft.Icons.CLOSE,
+        )
 
         if self.page.width:
             width = self.page.width * 0.75
@@ -512,9 +534,20 @@ class EditQuestionsTabController:
             logging.info(f"Сохранённые значения: {values}")
             self.page.pop_dialog()
 
-        button_add_row = StyledButton(content="Добавить поле", on_click=add_textfield)
-        button_save = StyledButton(content="Сохранить", on_click=on_click_save)
-        button_close = StyledButton(content="Закрыть")
+        button_add_row = StyledButton(
+            content="Добавить поле",
+            icon=ft.Icons.ADD,
+            on_click=add_textfield,
+        )
+        button_save = StyledButton(
+            content="Сохранить",
+            icon=ft.Icons.SAVE,
+            on_click=on_click_save,
+        )
+        button_close = StyledButton(
+            content="Закрыть",
+            icon=ft.Icons.CLOSE,
+        )
 
         column_selections = ft.Column()
         column_selections.controls = [
@@ -563,25 +596,28 @@ class TabEditQuestions(EditQuestionsTabController):
         )
 
         self.button_delete = StyledButton(
+            content="Удалить",
+            icon=ft.Icons.DELETE,
+            on_click=self.on_click_button_delete,
             height=38,
             width=160,
             expand=2,
-            content="Удалить",
-            on_click=self.on_click_button_delete,
         )
         self.button_add = StyledButton(
-            height=38,
-            width=160,
-            expand=2,
             content="Добавить",
+            icon=ft.Icons.ADD,
             on_click=self.on_click_button_add,
+            width=160,
+            height=38,
+            expand=2,
         )
         self.button_edit = StyledButton(
-            height=38,
-            width=160,
-            expand=2,
             content="Изменить",
+            icon=ft.Icons.EDIT,
             on_click=self.on_click_button_edit,
+            width=160,
+            height=38,
+            expand=2,
         )
 
         self.button_paste = StyledButton(

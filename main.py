@@ -66,9 +66,9 @@ class DocTemplater:
             content=ft.Column(spacing=0, controls=[tab_bar, tab_bar_view]),
         )
 
-        def on_resize():
-            width = self.page.width
-            height = self.page.height
+        def on_resize(e: ft.PageResizeEvent):
+            width = e.width
+            height = e.height
 
             if not height or not width:
                 return

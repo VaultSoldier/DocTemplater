@@ -81,11 +81,25 @@ class TabEditDocument:
 
         self.save_file_path = ""
         self.button_create = StyledButton(
-            content="Создать билет(ы)",
+            tooltip="Создать билет(ы)",
+            icon=ft.Icons.QUEUE,
+            content=ft.Text(
+                value="Создать билет(ы)",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            ),
             disabled=True,
             on_click=self.on_click_button_create,
         )
-        self.button_clear_fields = StyledButton(content="Очистить поля")
+        self.button_clear_fields = StyledButton(
+            tooltip="Очистить поля",
+            icon=ft.Icons.CLEAR_ALL,
+            content=ft.Text(
+                value="Очистить поля",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            ),
+        )
 
         self.textfield_ticket_number = StyledTextField(
             label="Количество билетов",
@@ -310,15 +324,18 @@ class TabEditDocument:
         responsive_row.controls = [
             StyledButton(
                 content="Открыть файл",
+                icon=ft.Icons.OPEN_IN_NEW,
                 expand=True,
                 on_click=lambda e: open_file(filepath),
             ),
             StyledButton(
                 content="Открыть папку",
+                icon=ft.Icons.FOLDER_OPEN,
                 on_click=lambda e: open_file(str(Path(filepath).parent)),
             ),
             StyledButton(
                 content="Закрыть",
+                icon=ft.Icons.CLOSE,
                 expand=True,
                 on_click=self.page.pop_dialog,
             ),
