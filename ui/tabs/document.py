@@ -27,37 +27,48 @@ class TabEditDocument:
         self.docx_processing = Processing()
         self.page = page
 
-        self.textfield_subject = StyledTextField(
+        self.dropdown_textfield_subject = ft.Dropdown(
             label="Предмет",
-            on_change=self.on_change_validate,
+            enable_search=True,
+            editable=True,
             expand=True,
             dense=True,
-            max_length=180,
-            counter="",
+            height=40,
+            border_color="#7799b8",
+            border_radius=1,
         )
-        self.textfield_spec = StyledTextField(
-            label="Специальность",
-            on_change=self.on_change_validate,
-            expand=True,
-            dense=True,
-            max_length=180,
-            counter="",
-        )
-        self.textfield_cmk = StyledTextField(
+
+        self.dropdown_textfield_cmk = ft.Dropdown(
             label="Председатель ЦМK",
-            on_change=self.on_change_validate,
+            enable_search=True,
+            editable=True,
             expand=True,
             dense=True,
-            max_length=180,
-            counter="",
+            height=40,
+            border_color="#7799b8",
+            border_radius=1,
         )
-        self.textfield_tutor = StyledTextField(
-            label="Преподаватель",
-            on_change=self.on_change_validate,
+
+        self.dropdown_textfield_spec = ft.Dropdown(
+            label="Специальность",
+            enable_search=True,
+            editable=True,
             expand=True,
             dense=True,
-            max_length=180,
-            counter="",
+            height=40,
+            border_color="#7799b8",
+            border_radius=1,
+        )
+
+        self.dropdown_textfield_tutor = ft.Dropdown(
+            label="Преподаватель",
+            enable_search=True,
+            editable=True,
+            expand=True,
+            dense=True,
+            height=40,
+            border_color="#7799b8",
+            border_radius=1,
         )
 
         self.checkbox_qualifying = ft.Checkbox(label="Квалификационные билеты")
@@ -192,10 +203,10 @@ class TabEditDocument:
 
     def _textfield_clear(self, e) -> None:
         for field in (
-            self.textfield_cmk,
-            self.textfield_spec,
-            self.textfield_subject,
-            self.textfield_tutor,
+            self.dropdown_textfield_cmk,
+            self.dropdown_textfield_spec,
+            self.dropdown_textfield_subject,
+            self.dropdown_textfield_tutor,
             self.textfield_ticket_number,
         ):
             field.value = ""
@@ -203,13 +214,13 @@ class TabEditDocument:
 
     def on_change_validate(
         self,
-        e: ft.ControlEvent,
-    ) -> None:
+        e: ft.Event[ft.Dropdown]
+    ):
         textfields = (
-            self.textfield_subject,
-            self.textfield_spec,
-            self.textfield_cmk,
-            self.textfield_tutor,
+            self.dropdown_textfield_subject,
+            self.dropdown_textfield_spec,
+            self.dropdown_textfield_cmk,
+            self.dropdown_textfield_tutor,
         )
 
         filled_any = any((tf.value or "").strip() for tf in textfields)
@@ -225,13 +236,13 @@ class TabEditDocument:
 
     async def handle_save_file(self) -> str | None:
         space = ""
-        if self.textfield_spec.value:
+        if self.dropdown_textfield_spec.value:
             space = " по "
 
         return await ft.FilePicker().save_file(
             dialog_title="Сохранить файл",
             allowed_extensions=["docx"],
-            file_name=f"Билеты промежуточной аттестации{space}{self.textfield_spec.value}.docx",
+            file_name=f"Билеты промежуточной аттестации{space}{self.dropdown_textfield_spec.value}.docx",
         )
 
     async def on_click_button_create(self, e: ft.Event[ft.Button]) -> None:
@@ -282,10 +293,10 @@ class TabEditDocument:
         try:
             response = self.docx_processing.process_docx(
                 save_to=save_file_path,
-                subject=(self.textfield_subject.value or ""),
-                spec=(self.textfield_spec.value or ""),
-                cmk=(self.textfield_cmk.value or ""),
-                tutor=(self.textfield_tutor.value or ""),
+                subject=(self.dropdown_textfield_subject.value or ""),
+                spec=(self.dropdown_textfield_spec.value or ""),
+                cmk=(self.dropdown_textfield_cmk.value or ""),
+                tutor=(self.dropdown_textfield_tutor.value or ""),
                 date=(self.date_row.value),
                 qualify_status=self.checkbox_qualifying.value,
                 tickets_count=tickets_count,
@@ -460,13 +471,16 @@ class TabEditDocument:
             controls=[
                 ft.Column(
                     col={"sm": 6},
-                    controls=[self.textfield_cmk, self.date_row],
+                    controls=[self.dropdown_textfield_cmk, self.date_row],
                 ),
                 ft.Column(
                     col={"sm": 6},
-                    controls=[self.textfield_subject, self.textfield_spec],
+                    controls=[
+                        self.dropdown_textfield_subject,
+                        self.dropdown_textfield_spec,
+                    ],
                 ),
-                self.textfield_tutor,
+                self.dropdown_textfield_tutor,
                 self.checkbox_qualifying,
             ],
         )
