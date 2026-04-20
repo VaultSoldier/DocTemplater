@@ -1,9 +1,11 @@
+import logging
 import os
 import re
 import sqlite3
 import sys
 from typing import Any, Final
 
+import requests
 from docx2python import docx2python
 from platformdirs import user_data_dir
 
@@ -11,6 +13,66 @@ from core.types import OrderType, QuestionType
 
 APP_NAME: Final[str] = "DocTemplater"
 APP_AUTHOR: Final[str] = "SSK"
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY,
+    api_base TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS questions (
+    id INTEGER PRIMARY KEY,
+    question TEXT NOT NULL,
+    question_type TEXT CHECK (question_type IN ('theory', 'practice'))
+);
+
+CREATE TABLE IF NOT EXISTS subjects (
+    id   INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS specialtie (
+    id   INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS specialtie_subject_link (
+    id            INTEGER PRIMARY KEY,
+    specialtie_id INTEGER,
+    subject_id    INTEGER
+);
+CREATE TABLE IF NOT EXISTS chairman_cmk (
+    id   INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS teacher (
+    id   INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+"""
+TABLES = [
+    (
+        "subjects",
+        "/subjects/",
+        ["id", "name"],
+    ),
+    (
+        "specialtie",
+        "/specialtie/",
+        ["id", "name"],
+    ),
+    (
+        "specialtie_subject_link",
+        "/specialtie_subject_link/",
+        ["id", "specialtie_id", "subject_id"],
+    ),
+    (
+        "chairman_cmk",
+        "/chairman_cmk/",
+        ["id", "name"],
+    ),
+    (
+        "teacher",
+        "/teacher/",
+        ["id", "name"],
+    ),
+]
 
 
 def get_resource_path_temp(relative_path: str) -> str:
@@ -25,24 +87,86 @@ def get_resource_path_temp(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 
+class InitDatabase:
+    def __init__(self):
+        data_dir = user_data_dir(APP_NAME, APP_AUTHOR)
+        os.makedirs(data_dir, exist_ok=True)
+        self.filepath = os.path.join(data_dir, "data.db")
+
+        cur = sqlite3.connect(self.filepath).cursor()
+        cur.executescript(SCHEMA)
+
+        self._sync_all()
+
+    def _sync_all(self):
+        logging.info("Starting sync...")
+        with sqlite3.connect(self.filepath) as conn:
+            for table, endpoint, columns in TABLES:
+                try:
+                    self.sync_table(conn, table, endpoint, columns)
+                except requests.RequestException as e:
+                    logging.error(f"{table}: API error — {e}")
+                except Exception as e:
+                    logging.error(f"{table}: unexpected error — {e}")
+                    raise  # re-raise to trigger rollback
+        logging.info("Sync complete")
+
+    def fetch(self, endpoint: str) -> list[dict]:
+        with sqlite3.connect(self.filepath) as conn:
+            cur = conn.cursor()
+            sql = "SELECT api_base FROM settings"
+            row = cur.execute(sql).fetchone()
+            result = row[0] if row else None
+
+        API_BASE = result if result is not None else "http://localhost:8000"
+        url = f"{API_BASE}{endpoint}"
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+
+    def sync_table(
+        self, conn: sqlite3.Connection, table: str, endpoint: str, columns: list[str]
+    ):
+        records = self.fetch(endpoint)
+
+        if not records:
+            logging.info(f"{table}: no records from API, skipping")
+            return
+
+        # Filter out records with null id
+        records = [r for r in records if r.get("id") is not None]
+        remote_ids = {r["id"] for r in records}
+
+        # Upsert all remote records
+        col_list = ", ".join(columns)
+        placeholders = ", ".join(f":{c}" for c in columns)
+        updates = ", ".join(f"{c} = excluded.{c}" for c in columns if c != "id")
+
+        conn.executemany(
+            f"""
+            INSERT INTO {table} ({col_list})
+            VALUES ({placeholders})
+            ON CONFLICT(id) DO UPDATE SET {updates}
+            """,
+            records,
+        )
+
+        # Delete local rows that no longer exist remotely
+        local_ids = {row[0] for row in conn.execute(f"SELECT id FROM {table}")}
+        deleted_ids = local_ids - remote_ids
+        if deleted_ids:
+            conn.executemany(
+                f"DELETE FROM {table} WHERE id = ?", [(i,) for i in deleted_ids]
+            )
+
+        logging.info(f"{table}: {len(records)} upserted, {len(deleted_ids)} deleted")
+
+
 class SqliteData:
     def __init__(self) -> None:
         data_dir = user_data_dir(APP_NAME, APP_AUTHOR)
         os.makedirs(data_dir, exist_ok=True)
-
         self.filepath = os.path.join(data_dir, "data.db")
-        con = sqlite3.connect(database=self.filepath, autocommit=True)
-        cur = con.cursor()
-
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS questions (
-                id INTEGER PRIMARY KEY,
-                question UNICODE NOT NULL,
-                question_type TEXT CHECK (question_type IN ('theory', 'practice'))
-            )
-            """
-        )
 
     def add_line(self, line: str, question_type: QuestionType):
         with sqlite3.connect(self.filepath) as conn:
@@ -57,15 +181,12 @@ class SqliteData:
         with sqlite3.connect(self.filepath) as conn:
             cur = conn.cursor()
             validated = []
-
             for question in rows:
                 if not isinstance(question, str):
                     raise ValueError(f"Invalid question: {question}")
                 elif len(question.strip()) == 0:
                     raise ValueError("Empty line")
-
                 validated.append((question.strip(), question_type.value))
-
             sql = "INSERT INTO questions(question, question_type) VALUES(?,?)"
             cur.executemany(sql, validated)
 
@@ -97,14 +218,12 @@ class SqliteData:
 
         with sqlite3.connect(self.filepath) as conn:
             cur = conn.cursor()
-
             sql = f"""
                 SELECT id, question
                 FROM questions
                 WHERE question_type = ?
                 ORDER BY id {order_type.value}
             """
-
             result = cur.execute(sql, (question_type.value,))
             return {row[0]: row[1] for row in result}
 
@@ -121,14 +240,12 @@ class SqliteData:
         """
         with sqlite3.connect(self.filepath) as conn:
             cur = conn.cursor()
-
             sql = f"""
                 SELECT question
                 FROM questions
                 WHERE question_type = ?
                 ORDER BY id {order_type.value}
             """
-
             result = cur.execute(sql, (question_type.value,))
             rows = result.fetchall()
             return [row[0] for row in rows]
@@ -137,17 +254,14 @@ class SqliteData:
 class TextProcessing:
     def get_dict(self, filepath: str) -> list[str] | None:
         REGEX = r"^\s*\d+[.)]{1,2}\s*"  # пример: 1) или 1. или 1.)
-
         with open(filepath, "r", encoding="utf-8") as file:
             values = [
                 cleaned
                 for q in file
                 if (cleaned := clean_question_by_regex(REGEX, q)) != ""
             ]
-
             if not any(values):
                 return
-
             return values
 
 

@@ -112,4 +112,6 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
+    from core.processing.data import InitDatabase
+    init_db = InitDatabase()
     ft.run(main=main, assets_dir="assets")
