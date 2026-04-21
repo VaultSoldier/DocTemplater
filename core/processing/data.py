@@ -120,7 +120,7 @@ class InitDatabase:
 
         API_BASE = result if result is not None else "http://localhost:8000"
         url = f"{API_BASE}{endpoint}"
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(url, timeout=15)
         resp.raise_for_status()
         return resp.json()
 
@@ -158,7 +158,6 @@ class InitDatabase:
             conn.executemany(
                 f"DELETE FROM {table} WHERE id = ?", [(i,) for i in deleted_ids]
             )
-
         logging.info(f"{table}: {len(records)} upserted, {len(deleted_ids)} deleted")
 
 
