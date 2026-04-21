@@ -2,6 +2,7 @@ import logging
 
 import flet as ft
 
+from ui.settings import Settings
 from ui.tabs.document import TabEditDocument
 from ui.tabs.questions import TabEditQuestions
 
@@ -20,50 +21,62 @@ class DocTemplater:
     def init_ui(self):
         text_tab_document = ft.Text("Данные документа")
         text_tab_questions = ft.Text("Списки вопросов")
+        text_tab_settings = ft.Text("Настройки")
 
         tab_edit_document = TabEditDocument(self.page)
         tab_edit_questions = TabEditQuestions(self.page)
+        settings = Settings(self.page)
 
-        tab_bar = ft.TabBar(
-            label_text_style=ft.TextStyle(size=14),
-            scrollable=False,
-            divider_height=1,
-            margin=0,
-            tabs=[
-                ft.Row(
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    tooltip=text_tab_document.value,
-                    controls=[
-                        ft.Icon(ft.Icons.EDIT_DOCUMENT),
-                        text_tab_document,
-                    ],
-                ),
-                ft.Row(
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    tooltip=text_tab_questions.value,
-                    controls=[
-                        ft.Icon(ft.Icons.NOTES),
-                        text_tab_questions,
-                    ],
-                ),
-            ],
-        )
-
-        tab_bar_view = ft.TabBarView(
-            margin=0,
+        tab_view = ft.TabBarView(
             expand=True,
             controls=[
                 tab_edit_document.get_tab_ui(),
                 tab_edit_questions.get_tab_ui(),
             ],
         )
-        tabs = ft.Tabs(
+
+        tab_bar = ft.Row(
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=0,
+            controls=[
+                # Centered
+                ft.TabBar(
+                    expand=True,
+                    scrollable=False,
+                    tabs=[
+                        ft.Row(
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            controls=[
+                                ft.Icon(ft.Icons.EDIT_DOCUMENT),
+                                text_tab_document,
+                            ],
+                        ),
+                        ft.Row(
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            controls=[ft.Icon(ft.Icons.NOTES), text_tab_questions],
+                        ),
+                    ],
+                ),
+                # Right pinned
+                ft.Row(
+                    margin=ft.Margin(left=4, top=0, right=6, bottom=0),
+                    controls=[
+                        ft.IconButton(
+                            ft.Icons.SETTINGS,
+                            on_click = settings.show
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        main_ui = ft.Tabs(
             margin=0,
             length=2,
             expand=True,
             selected_index=0,
             animation_duration=50,
-            content=ft.Column(spacing=0, controls=[tab_bar, tab_bar_view]),
+            content=ft.Column(spacing=0, controls=[tab_bar, tab_view]),
         )
 
         def on_resize(e: ft.PageResizeEvent):
@@ -83,14 +96,16 @@ class DocTemplater:
             if width < 575:
                 text_tab_document.visible = False
                 text_tab_questions.visible = False
+                text_tab_settings.visible = False
             else:
                 text_tab_document.visible = True
                 text_tab_questions.visible = True
+                text_tab_settings.visible = True
             self.page.update()
 
         self.page.on_resize = on_resize
 
-        return tabs
+        return main_ui
 
 
 def main(page: ft.Page):
@@ -113,5 +128,6 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     from core.processing.data import InitDatabase
+
     init_db = InitDatabase()
     ft.run(main=main, assets_dir="assets")
