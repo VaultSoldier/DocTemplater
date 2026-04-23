@@ -12,40 +12,7 @@ from platformdirs import user_data_dir
 from core.types import OrderType, QuestionType
 
 APP_NAME: Final[str] = "DocTemplater"
-APP_AUTHOR: Final[str] = "SSK"
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS settings (
-    id INTEGER PRIMARY KEY,
-    api_base TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS questions (
-    id INTEGER PRIMARY KEY,
-    question TEXT NOT NULL,
-    question_type TEXT CHECK (question_type IN ('theory', 'practice'))
-);
-
-CREATE TABLE IF NOT EXISTS subjects (
-    id   INTEGER PRIMARY KEY,
-    name TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS specialtie (
-    id   INTEGER PRIMARY KEY,
-    name TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS specialtie_subject_link (
-    id            INTEGER PRIMARY KEY,
-    specialtie_id INTEGER,
-    subject_id    INTEGER
-);
-CREATE TABLE IF NOT EXISTS chairman_cmk (
-    id   INTEGER PRIMARY KEY,
-    name TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS teacher (
-    id   INTEGER PRIMARY KEY,
-    name TEXT NOT NULL
-);
-"""
+APP_AUTHOR: Final[str] = "JonhSmith"
 TABLES = [
     (
         "subjects",
@@ -87,23 +54,97 @@ def get_resource_path_temp(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 
-class InitDatabase:
+class AppSettings:
     def __init__(self):
         data_dir = user_data_dir(APP_NAME, APP_AUTHOR)
         os.makedirs(data_dir, exist_ok=True)
         self.filepath = os.path.join(data_dir, "data.db")
 
-        cur = sqlite3.connect(self.filepath).cursor()
-        cur.executescript(SCHEMA)
+    def load(self) -> dict:
+        with sqlite3.connect(self.filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+            return dict(row)
 
+    def save(self, **kwargs):
+        current = self.load()
+        current.update(kwargs)
+        with sqlite3.connect(self.filepath) as conn:
+            conn.execute(
+                """UPDATE settings SET api_base=?, theme_mode=? WHERE id=1""",
+                (current["api_base"], current["theme_mode"]),
+            )
+
+
+class InitDatabase:
+    SETTINGS_DEFAULTS: Final = {
+        "theme_mode": "system",
+    }
+    SCHEMA: Final = """
+        CREATE TABLE IF NOT EXISTS settings (
+            id INTEGER PRIMARY KEY,
+            theme_mode TEXT NOT NULL,
+            api_base TEXT
+        );
+        CREATE TABLE IF NOT EXISTS questions (
+            id INTEGER PRIMARY KEY,
+            question TEXT NOT NULL,
+            question_type TEXT CHECK (question_type IN ('theory', 'practice'))
+        );
+
+        CREATE TABLE IF NOT EXISTS subjects (
+            id   INTEGER PRIMARY KEY,
+            name TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS specialtie (
+            id   INTEGER PRIMARY KEY,
+            name TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS specialtie_subject_link (
+            id            INTEGER PRIMARY KEY,
+            specialtie_id INTEGER,
+            subject_id    INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS chairman_cmk (
+            id   INTEGER PRIMARY KEY,
+            name TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS teacher (
+            id   INTEGER PRIMARY KEY,
+            name TEXT NOT NULL
+        );
+    """
+
+    def __init__(self):
+        data_dir = user_data_dir(APP_NAME, APP_AUTHOR)
+        os.makedirs(data_dir, exist_ok=True)
+        self.filepath = os.path.join(data_dir, "data.db")
+
+    def _init(self):
+        with sqlite3.connect(self.filepath) as conn:
+            conn.executescript(self.SCHEMA)
+            conn.execute(
+                """INSERT OR IGNORE INTO settings (id, theme_mode)
+                            VALUES (1, :theme_mode)""",
+                self.SETTINGS_DEFAULTS,
+            )
         self._sync_all()
 
     def _sync_all(self):
         logging.info("Starting sync...")
         with sqlite3.connect(self.filepath) as conn:
+            cur = conn.cursor()
+            sql = "SELECT api_base FROM settings"
+            row = cur.execute(sql).fetchone()
+            api_base = row[0] if row else None
+
+            if api_base is None:
+                logging.info("Stopping sync, no API URL...")
+                return
+
             for table, endpoint, columns in TABLES:
                 try:
-                    self.sync_table(conn, table, endpoint, columns)
+                    self.sync_table(conn, table, api_base, endpoint, columns)
                 except requests.RequestException as e:
                     logging.error(f"{table}: API error — {e}")
                 except Exception as e:
@@ -111,23 +152,15 @@ class InitDatabase:
                     raise  # re-raise to trigger rollback
         logging.info("Sync complete")
 
-    def fetch(self, endpoint: str) -> list[dict]:
-        with sqlite3.connect(self.filepath) as conn:
-            cur = conn.cursor()
-            sql = "SELECT api_base FROM settings"
-            row = cur.execute(sql).fetchone()
-            result = row[0] if row else None
-
-        API_BASE = result if result is not None else "http://localhost:8000"
-        url = f"{API_BASE}{endpoint}"
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
-
     def sync_table(
-        self, conn: sqlite3.Connection, table: str, endpoint: str, columns: list[str]
+        self,
+        conn: sqlite3.Connection,
+        table: str,
+        api_base: str,
+        endpoint: str,
+        columns: list[str],
     ):
-        records = self.fetch(endpoint)
+        records = self.fetch(api_base, endpoint)
 
         if not records:
             logging.info(f"{table}: no records from API, skipping")
@@ -159,6 +192,29 @@ class InitDatabase:
                 f"DELETE FROM {table} WHERE id = ?", [(i,) for i in deleted_ids]
             )
         logging.info(f"{table}: {len(records)} upserted, {len(deleted_ids)} deleted")
+
+    def fetch(self, api_base, endpoint: str) -> list[dict]:
+        url = f"{api_base}{endpoint}"
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+
+    def reset_db(self):
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.cursor()
+            for obj_type in ("trigger", "view", "index", "table"):
+                cursor.execute(
+                    """
+                    SELECT name FROM sqlite_master
+                    WHERE type = ? AND name NOT LIKE 'sqlite_%'
+                    """,
+                    (obj_type,),
+                )
+                for (name,) in cursor.fetchall():
+                    cursor.execute(f'DROP {obj_type.upper()} IF EXISTS "{name}"')
+
+        self._init()
+        logging.info("Database reset complete")
 
 
 class SqliteData:
@@ -232,8 +288,6 @@ class SqliteData:
         order_type: OrderType = OrderType.DESC,
     ) -> list[Any]:
         """
-        Возвращает list[вопрос]
-
         Sqlite может вернуть int или float,
         если в строку бд записано только число.
         """
@@ -248,6 +302,17 @@ class SqliteData:
             result = cur.execute(sql, (question_type.value,))
             rows = result.fetchall()
             return [row[0] for row in rows]
+
+    def has_questions(self, question_type: QuestionType) -> bool:
+        with sqlite3.connect(self.filepath) as conn:
+            cur = conn.cursor()
+            sql = """
+                SELECT 1
+                FROM questions
+                WHERE question_type = ?
+                LIMIT 1
+            """
+            return cur.execute(sql, (question_type.value,)).fetchone() is not None
 
 
 class TextProcessing:

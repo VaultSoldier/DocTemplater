@@ -11,14 +11,17 @@ from flet import (
     ColorValue,
     Control,
     ControlEventHandler,
+    Dropdown,
     Icon,
     IconDataOrControl,
     InputFilter,
     MainAxisAlignment,
+    MenuStyle,
     Number,
     OutlinedBorder,
     PaddingValue,
     Segment,
+    StrOrControl,
 )
 from flet.controls.alignment import Axis
 
@@ -26,11 +29,11 @@ from flet.controls.alignment import Axis
 class Overlay(ft.Container):
     def __init__(
         self,
-        text_value: str = "Выберите файл...",
+        text_value: str,
         text_size: Number = 32,
-        text_color: Optional[ColorValue] = "",
+        text_color: Optional[ColorValue] = None,
         content: Optional[Control] = None,
-        bgcolor: Optional[ColorValue] = "dark",
+        bgcolor: Optional[ColorValue] = None,
         blend_mode=ft.BlendMode.OVERLAY,
         blur: Union[
             None, float, int, Tuple[Union[float, int], Union[float, int]], Blur
@@ -76,8 +79,8 @@ class DateRow(ft.Container):
             self.menu_height = None
 
         super().__init__()
-        self.border = ft.Border.all(1, color="#7799b8")
-        self.border_radius = 1
+        self.border = None
+        self.border_radius = 0
         self.padding = 0
         self.expand = True
         self.on_select = on_select or (lambda x: None)
@@ -113,15 +116,20 @@ class DateRow(ft.Container):
             dd.update()
 
     def _calendar_button(self, date_picker):
-        return ft.IconButton(
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=9),
-                bgcolor="",
+        button_style = ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(
+                side=ft.BorderSide(color="#7799b8"),
+                radius=0,
             ),
-            height=38,
-            icon=ft.Icons.DATE_RANGE,
-            on_click=lambda _: self._page.show_dialog(date_picker),
+            bgcolor="",
         )
+        button = ft.IconButton(
+            icon=ft.Icons.DATE_RANGE,
+            height=38,
+            style=button_style,
+            on_click=lambda: self._page.show_dialog(date_picker),
+        )
+        return button
 
     def _years(self) -> None:
         year = dt.date.today().year
@@ -161,6 +169,8 @@ class DateRow(ft.Container):
         """
         self.date_controls_dict[name] = ft.Dropdown(
             options=[ft.dropdown.Option(x) for x in elements],
+            border_radius=ft.BorderRadius.all(0),
+            border_color="#7799b8",
             menu_style=ft.MenuStyle(padding=0, visual_density=ft.VisualDensity.COMPACT),
             height=38,
             expand=True,
@@ -291,6 +301,34 @@ class StyledButton(ft.Button):
         self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=6))
 
 
+class StyledIconButton(ft.IconButton):
+    def __init__(
+        self,
+        icon: Optional[IconDataOrControl] = None,
+        tooltip: ft.TooltipValue | None = None,
+        height: Optional[Number] = 36,
+        width: Optional[Number] = 160,
+        expand: bool | int | None = True,
+        on_click: Optional[ControlEventHandler[ft.IconButton]] = None,
+        disabled: bool = False,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            icon=icon,
+            tooltip=tooltip,
+            on_click=on_click,
+            disabled=disabled,
+            height=height,
+            width=width,
+            expand=expand,
+            *args,
+            **kwargs,
+        )
+
+        self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=6))
+
+
 class StyledTextField(ft.TextField):
     def __init__(
         self,
@@ -302,7 +340,7 @@ class StyledTextField(ft.TextField):
         border_radius: Optional[BorderRadiusValue] = 1,
         max_length: Optional[int] = None,
         expand: Optional[bool | int] = None,
-        dense: Optional[bool] = None,
+        dense: Optional[bool] = True,
         icon: Optional[Icon] = None,
         on_change=None,
         *args,
@@ -325,35 +363,84 @@ class StyledTextField(ft.TextField):
         )
 
 
+class StyledDropdown(ft.Dropdown):
+    def __init__(
+        self,
+        value: str | None = None,
+        text: str | None = None,
+        enable_filter: bool = False,
+        enable_search: bool = True,
+        editable: bool = True,
+        menu_height: Number | None = None,
+        menu_width: Number | None = None,
+        menu_style: MenuStyle | None = None,
+        input_filter: InputFilter | None = None,
+        trailing_icon: IconDataOrControl | None = None,
+        leading_icon: IconDataOrControl | None = None,
+        on_select: ControlEventHandler[Dropdown] | None = None,
+        on_text_change: ControlEventHandler[Dropdown] | None = None,
+        on_focus: ControlEventHandler[Dropdown] | None = None,
+        label: StrOrControl | None = None,
+        border_width: Number = 1,
+        border_color: ColorValue | None = "#7799b8",
+        border_radius: BorderRadiusValue | None = 1,
+        dense: bool = True,
+        filled: bool = False,
+        helper_text: str | None = None,
+        expand: bool | int | None = True,
+        height: Number | None = 40,
+    ):
+        super().__init__(
+            value=value,
+            text=text,
+            enable_filter=enable_filter,
+            enable_search=enable_search,
+            editable=editable,
+            menu_height=menu_height,
+            menu_width=menu_width,
+            menu_style=menu_style,
+            input_filter=input_filter,
+            trailing_icon=trailing_icon,
+            leading_icon=leading_icon,
+            on_select=on_select,
+            on_text_change=on_text_change,
+            on_focus=on_focus,
+            label=label,
+            border_width=border_width,
+            border_color=border_color,
+            border_radius=border_radius,
+            dense=dense,
+            filled=filled,
+            helper_text=helper_text,
+            expand=expand,
+            height=height,
+        )
+
+
 class WarnPopup(ft.SnackBar):
     def __init__(self, text):
         self.text = text
-        super().__init__(content=self.row())
+        super().__init__(content=self.warn_content(self.text))
 
         self.elevation = 0
-        self.duration = 2500
+        self.duration = 2600
         self.margin = ft.Margin.only(bottom=50)
         self.bgcolor = ft.Colors.TRANSPARENT
         self.behavior = ft.SnackBarBehavior.FLOATING
 
-    def row(self):
-        return ft.Row(
-            alignment=MainAxisAlignment.CENTER,
-            controls=[self.warn_content(self.text)],
-        )
-
     def warn_content(self, text):
         bg_color = "#384759"
-        return ft.Container(
+        container = ft.Container(
             border=ft.Border.all(12, bg_color),
-            border_radius=ft.border_radius.all(9),
+            border_radius=ft.BorderRadius.all(9),
             bgcolor=bg_color,
             content=ft.Text(
+                value=text,
                 color=ft.Colors.WHITE,
                 text_align=ft.TextAlign.CENTER,
-                value=text,
             ),
         )
+        return ft.Row([container], alignment=ft.MainAxisAlignment.CENTER)
 
 
 class StyledAlertDialog(ft.AlertDialog):

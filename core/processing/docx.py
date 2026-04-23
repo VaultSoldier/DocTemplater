@@ -114,14 +114,12 @@ class Processing:
                 raise NoQuestionsError("Нету практических вопросов")
             case "Theoretical" if self.theoretical_questions_count <= 0:
                 raise NoQuestionsError("Нету теоретических вопросов")
-
             case "Manual" if tickets_count is not None:
                 tickets = range(tickets_count)
             case "Practical":
                 tickets = range(self.practical_questions_count)
             case "Theoretical":
                 tickets = range(self.theoretical_questions_count)
-
             case _:
                 raise UnknownTicketTypeError(
                     f"Неизвестный тип билетов: {tickets_count_type}"
