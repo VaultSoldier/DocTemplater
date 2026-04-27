@@ -721,16 +721,18 @@ class TabEditQuestions(EditQuestionsTabController):
                 overflow=ft.TextOverflow.FADE,
                 no_wrap=True,
             ),
+            tooltip="Вставить",
             icon=ft.Icons.PASTE,
             on_click=self.on_click_paste,
         )
 
         self.button_upload_docx = StyledButton(
             content=ft.Text(
-                value="Загрузить",
+                value="Импорт",
                 overflow=ft.TextOverflow.FADE,
                 no_wrap=True,
             ),
+            tooltip="Импорт",
             icon=ft.Icons.FILE_UPLOAD,
             on_click=self.on_click_button_upload,
         )

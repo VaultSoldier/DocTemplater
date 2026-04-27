@@ -419,18 +419,18 @@ class TabEditDocument:
                     value="fallback",
                     icon=ft.Icons.AUTO_AWESOME,
                     label=ft.Text(
-                        "Смешанные",
+                        "Смешанный",
                         overflow=ft.TextOverflow.FADE,
                         no_wrap=True,
                     ),
-                    tooltip="Не случайные, если закончились — случайные",
+                    tooltip="Не случайный, если закончились — случайный",
                     expand=True,
                 ),
                 ft.Segment(
                     value="always",
                     icon=ft.Icons.SHUFFLE,
                     label=ft.Text(
-                        "Случайные",
+                        "Случайный",
                         overflow=ft.TextOverflow.FADE,
                         no_wrap=True,
                     ),
@@ -441,7 +441,7 @@ class TabEditDocument:
                     value="none",
                     icon=ft.Icons.CLOSE,
                     label=ft.Text(
-                        "Не случайные",
+                        "Не случайный",
                         overflow=ft.TextOverflow.FADE,
                         no_wrap=True,
                     ),
@@ -470,7 +470,7 @@ class TabEditDocument:
 
         cards_rnd: List[ft.Control] = [
             ft.Text(
-                "Выборка вопросов",
+                "Порядок вопросов",
                 margin=ft.Margin.only(left=6),
                 weight=ft.FontWeight.BOLD,
                 size=18,
