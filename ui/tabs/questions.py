@@ -258,20 +258,17 @@ class EditQuestionsTabController:
             self.page.overlay.remove(overlay)
             self.page.update()
 
-        def warning():
-            self.page.show_dialog(
-                WarnPopup("Выберите документ (.docx) или текстовый файл (.txt)")
-            )
+        error_message: str = "Выберите документ (.docx) или текстовый файл (.txt)"
 
         if not picked_files:
-            warning()
+            self.page.show_dialog(WarnPopup(error_message))
             return
 
         filepath = picked_files[0].path
         logging.info(filepath)
 
         if not filepath:
-            warning()
+            self.page.show_dialog(WarnPopup(error_message))
             return
 
         if filepath[-5:].lower() == ".docx":
@@ -279,30 +276,46 @@ class EditQuestionsTabController:
         elif filepath[-4:].lower() == ".txt":
             new_questions = self.text_processing.get_dict(filepath)
         else:
-            warning()
+            self.page.show_dialog(WarnPopup(error_message))
             return
 
         if not new_questions:
-            self.page.show_dialog(WarnPopup("В файле нету вопросов"))
+            self.page.show_dialog(WarnPopup("Не удалось найти данные"))
             return
 
-        button_practical = StyledButton("Практические")
-        button_theoretical = StyledButton("Теоретические")
-
-        button_practical.on_click = lambda e, qtype=QuestionType.PRACTICAL: (
-            on_click_save_to(e, qtype)
+        button_practical = StyledButton(
+            ft.Text(
+                "Практические",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            ),
+            on_click=lambda e, qtype=QuestionType.PRACTICAL: on_click_save_to(e, qtype),
         )
-        button_theoretical.on_click = lambda e, qtype=QuestionType.THEORETICAL: (
-            on_click_save_to(e, qtype)
+        button_theoretical = StyledButton(
+            ft.Text(
+                "Теоретические",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            ),
+            on_click=lambda e, qtype=QuestionType.THEORETICAL: on_click_save_to(
+                e, qtype
+            ),
+        )
+        button_abort = StyledButton(
+            ft.Text(
+                "Отмена",
+                overflow=ft.TextOverflow.FADE,
+                no_wrap=True,
+            ),
+            on_click=self.page.pop_dialog,
         )
 
         dialog_content = ft.Row(
             expand=True,
-            controls=[button_practical, button_theoretical],
+            controls=[button_practical, button_theoretical, button_abort],
         )
         # FIX: сделать распределение вопросов
         dialog = ft.AlertDialog(
-            title=ft.Text("Тип вопросов", text_align=ft.TextAlign.CENTER),
             alignment=ft.Alignment(0, 0),
             action_button_padding=0,
             actions_padding=0,
