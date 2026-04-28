@@ -37,26 +37,33 @@ class TabEditDocument:
         self.dropdown_textfield_subject = StyledDropdown(
             label="Предмет",
             on_select=self.on_change_validate,
-            on_text_change=self.on_change_validate,
+            on_text_change=self.on_dropdown_change_validate,
         )
 
         self.dropdown_textfield_cmk = StyledDropdown(
             label="Председатель ЦМK",
             on_select=self.on_change_validate,
-            on_text_change=self.on_change_validate,
+            on_text_change=self.on_dropdown_change_validate,
         )
 
         self.dropdown_textfield_spec = StyledDropdown(
             label="Специальность",
             on_select=self.on_change_validate,
-            on_text_change=self.on_change_validate,
+            on_text_change=self.on_dropdown_change_validate,
         )
 
         self.dropdown_textfield_tutor = StyledDropdown(
             label="Преподаватель",
             on_select=self.on_change_validate,
-            on_text_change=self.on_change_validate,
+            on_text_change=self.on_dropdown_change_validate,
         )
+
+        self.dropdowns = [
+            self.dropdown_textfield_spec,
+            self.dropdown_textfield_cmk,
+            self.dropdown_textfield_tutor,
+            self.dropdown_textfield_subject,
+        ]
 
         self.checkbox_qualifying = ft.Checkbox(label="Квалификационные билеты")
 
@@ -179,16 +186,14 @@ class TabEditDocument:
         self.date_row.value = formatted
         self.page.update()
 
+    def on_resize_change_dropdowns_height(self, height: float):
+        for i in self.dropdowns:
+            i.menu_height = height
+            i.update()
+
     def _textfield_clear(self, e) -> None:
         # FIX: Dropdown's text don't update it's representation in ui
-        dropdowns = (
-            self.dropdown_textfield_cmk,
-            self.dropdown_textfield_spec,
-            self.dropdown_textfield_subject,
-            self.dropdown_textfield_tutor,
-        )
-
-        for i in dropdowns:
+        for i in self.dropdowns:
             i.value = None
             i.text = ""
 
@@ -226,15 +231,18 @@ class TabEditDocument:
 
         self.on_change_validate()
 
+    def on_dropdown_change_validate(self, e: ft.Event[ft.Dropdown]):
+        if e.control.options == []:
+            e.control.menu_height = 0 
+        elif e.control.menu_height == 0:
+            e.control.menu_height = None
+            
+        e.control.update()
+        self.on_change_validate()
+
     def on_change_validate(self):
         can_enable_button = False
-        dropdowns = (
-            self.dropdown_textfield_cmk,
-            self.dropdown_textfield_spec,
-            self.dropdown_textfield_subject,
-            self.dropdown_textfield_tutor,
-        )
-        has_any_text = any((tf.text or "").strip() for tf in dropdowns)
+        has_any_text = any((tf.text or "").strip() for tf in self.dropdowns)
 
         match self.segmented_button_ticket_num.selected:
             case ["Manual"]:

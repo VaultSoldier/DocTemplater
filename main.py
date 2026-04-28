@@ -31,14 +31,15 @@ class DocTemplater:
         width: float | None,
         height: float | None,
         text_to_toggle: List[ft.Text],
-        tab_edit_document,
-        tab_edit_questions,
     ):
         if not height or not width:
             return
 
-        tab_edit_document.date_row.on_resize_change_height(height)
-        tab_edit_questions.dialog_content_edit_questions.width = width * 0.75
+        dropdown_height = height * 0.45
+
+        self.tab_edit_document.on_resize_change_dropdowns_height(dropdown_height)
+        self.tab_edit_document.date_row.on_resize_change_height(dropdown_height)
+        self.tab_edit_questions.dialog_content_edit_questions.width = width * 0.75
 
         if width < 575:
             for i in text_to_toggle:
@@ -135,8 +136,6 @@ class DocTemplater:
             self.apply_resize(
                 e.width,
                 e.height,
-                tab_edit_document=self.tab_edit_document,
-                tab_edit_questions=self.tab_edit_questions,
                 text_to_toggle=[
                     self.text_tab_document,
                     self.text_tab_questions,
@@ -168,8 +167,6 @@ def main(page: ft.Page):
     doc_templater.apply_resize(
         page.width,
         page.height,
-        tab_edit_document=doc_templater.tab_edit_document,
-        tab_edit_questions=doc_templater.tab_edit_questions,
         text_to_toggle=[
             doc_templater.text_tab_document,
             doc_templater.text_tab_questions,

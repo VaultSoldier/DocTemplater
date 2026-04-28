@@ -24,6 +24,7 @@ from flet import (
     StrOrControl,
 )
 from flet.controls.alignment import Axis
+from flet.controls.material.dropdown import DropdownOption
 
 
 class Overlay(ft.Container):
@@ -110,10 +111,9 @@ class DateRow(ft.Container):
         }
 
     def on_resize_change_height(self, height: float):
-        height = height * 0.45
-        for dd in self.date_controls_dict.values():
-            dd.menu_height = height
-            dd.update()
+        for i in self.date_controls_dict.values():
+            i.menu_height = height
+            i.update()
 
     def _calendar_button(self, date_picker):
         button_style = ft.ButtonStyle(
@@ -368,12 +368,16 @@ class StyledDropdown(ft.Dropdown):
         self,
         value: str | None = None,
         text: str | None = None,
+        options: list[DropdownOption] | None = None,
         enable_filter: bool = False,
         enable_search: bool = True,
         editable: bool = True,
-        menu_height: Number | None = None,
+        menu_height: Number | None = 10,
         menu_width: Number | None = None,
-        menu_style: MenuStyle | None = None,
+        menu_style: MenuStyle | None = ft.MenuStyle(
+            padding=ft.Padding.all(0),
+            visual_density=ft.VisualDensity.COMPACT,
+        ),
         input_filter: InputFilter | None = None,
         trailing_icon: IconDataOrControl | None = None,
         leading_icon: IconDataOrControl | None = None,
@@ -393,6 +397,7 @@ class StyledDropdown(ft.Dropdown):
         super().__init__(
             value=value,
             text=text,
+            options=options or [],
             enable_filter=enable_filter,
             enable_search=enable_search,
             editable=editable,
