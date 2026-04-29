@@ -225,18 +225,18 @@ class TabEditDocument:
 
         match qtype:
             case QuestionType.PRACTICAL:
-                self.page.show_dialog(WarnPopup("Добавьте практических вопросов"))
+                self.page.show_dialog(WarnPopup("Нет практических вопросов"))
             case QuestionType.THEORETICAL:
-                self.page.show_dialog(WarnPopup("Добавьте теоретических вопросов"))
+                self.page.show_dialog(WarnPopup("Нет теоретических вопросов"))
 
         self.on_change_validate()
 
     def on_dropdown_change_validate(self, e: ft.Event[ft.Dropdown]):
         if e.control.options == []:
-            e.control.menu_height = 0 
+            e.control.menu_height = 0
         elif e.control.menu_height == 0:
             e.control.menu_height = None
-            
+
         e.control.update()
         self.on_change_validate()
 
