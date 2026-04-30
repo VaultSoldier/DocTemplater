@@ -18,9 +18,10 @@ logging.basicConfig(
 
 
 class DocTemplater:
-    def __init__(self, page: ft.Page) -> None:
+    def __init__(self, page: ft.Page, init_database: InitDatabase) -> None:
         super().__init__()
         self.page: ft.Page = page
+        self.init_database = init_database
         self.tab_edit_document = TabEditDocument(self.page)
         self.tab_edit_questions = TabEditQuestions(self.page)
         self.text_tab_document = ft.Text("Данные документа")
@@ -50,31 +51,32 @@ class DocTemplater:
         self.page.update()
 
     def _init(self):
-        dialog_settings = Settings(self.page)
-        app_settings = AppSettings()
-        button_theme = ft.IconButton()
-
         def on_pubsub(topic):
             if topic == AppEvent.UPDATE_THEME:
-                load_theme(button_theme, self.page, app_settings)
+                load_theme(button_theme, self.page, data_app_settings)
                 self.page.update()
 
         self.page.pubsub.subscribe(on_pubsub)
+
+        app_settings = Settings(self.page, self.init_database.last_status)
+        data_app_settings = AppSettings()
+        button_theme = ft.IconButton()
+
 
         def switch_theme(e: ft.Event[ft.IconButton]):
             match self.page.theme_mode:
                 case ft.ThemeMode.SYSTEM:
                     self.page.theme_mode = ft.ThemeMode.LIGHT
                     e.control.icon = ft.Icons.LIGHT_MODE
-                    app_settings.save(theme_mode="light")
+                    data_app_settings.save(theme_mode="light")
                 case ft.ThemeMode.LIGHT:
                     self.page.theme_mode = ft.ThemeMode.DARK
                     e.control.icon = ft.Icons.DARK_MODE
-                    app_settings.save(theme_mode="dark")
+                    data_app_settings.save(theme_mode="dark")
                 case _:
                     self.page.theme_mode = ft.ThemeMode.SYSTEM
                     e.control.icon = ft.Icons.BRIGHTNESS_AUTO
-                    app_settings.save(theme_mode="system")
+                    data_app_settings.save(theme_mode="system")
             self.page.update()
 
         button_theme.on_click = switch_theme
@@ -87,9 +89,9 @@ class DocTemplater:
             ],
         )
 
-        load_theme(button_theme, self.page, app_settings)
+        load_theme(button_theme, self.page, data_app_settings)
         button_settings = ft.IconButton(
-            ft.Icons.SETTINGS, on_click=dialog_settings.show
+            ft.Icons.SETTINGS, on_click=app_settings.show
         )
 
         tab_bar = ft.Row(vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=0)
@@ -148,6 +150,9 @@ class DocTemplater:
 
 
 def main(page: ft.Page):
+    init_database = InitDatabase(page)
+    init_database._init()
+
     page.title = "DocTemplater"
     page.window.icon = "Logo.ico"
     page.padding = 0
@@ -160,7 +165,7 @@ def main(page: ft.Page):
         current_locale=ft.Locale("ru"),
     )
 
-    doc_templater = DocTemplater(page)
+    doc_templater = DocTemplater(page, init_database)
     app = doc_templater._init()
     page.add(app)
 
@@ -177,6 +182,4 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     from core.processing.data import InitDatabase
 
-    init_database = InitDatabase()
-    init_database._init()
     ft.run(main=main, assets_dir="assets")

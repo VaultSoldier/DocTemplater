@@ -5,11 +5,12 @@ import sqlite3
 import sys
 from typing import Any, Final
 
+import flet as ft
 import requests
 from docx2python import docx2python
 from platformdirs import user_data_dir
 
-from core.types import OrderType, QuestionType
+from core.types import AppEvent, OrderType, QuestionType
 
 APP_NAME: Final[str] = "DocTemplater"
 APP_AUTHOR: Final[str] = "JonhSmith"
@@ -115,10 +116,12 @@ class InitDatabase:
         );
     """
 
-    def __init__(self):
+    def __init__(self, page: ft.Page):
         data_dir = user_data_dir(APP_NAME, APP_AUTHOR)
         os.makedirs(data_dir, exist_ok=True)
         self.filepath = os.path.join(data_dir, "data.db")
+        self.page = page
+        self.last_status = None
 
     def _init(self):
         with sqlite3.connect(self.filepath) as conn:
@@ -132,13 +135,16 @@ class InitDatabase:
 
     def _sync_all(self):
         logging.info("Starting sync...")
+
         with sqlite3.connect(self.filepath) as conn:
             cur = conn.cursor()
             sql = "SELECT api_base FROM settings"
             row = cur.execute(sql).fetchone()
-            api_base = row[0] if row else None
+            api_base: str | None = row[0] if row else None
 
-            if api_base is None:
+            if not api_base:
+                self.last_status = AppEvent.API_NO_URL
+                self.page.pubsub.send_all(self.last_status)
                 logging.info("Stopping sync, no API URL...")
                 return
 
@@ -146,11 +152,14 @@ class InitDatabase:
                 try:
                     self.sync_table(conn, table, api_base, endpoint, columns)
                 except requests.RequestException as e:
+                    self.last_status = AppEvent.API_ERROR
+                    self.page.pubsub.send_all(self.last_status)
                     logging.error(f"{table}: API error — {e}")
                 except Exception as e:
+                    self.last_status = AppEvent.API_ERROR
+                    self.page.pubsub.send_all(self.last_status)
                     logging.error(f"{table}: unexpected error — {e}")
                     raise  # re-raise to trigger rollback
-        logging.info("Sync complete")
 
     def sync_table(
         self,
@@ -213,8 +222,8 @@ class InitDatabase:
                 for (name,) in cursor.fetchall():
                     cursor.execute(f'DROP {obj_type.upper()} IF EXISTS "{name}"')
 
-        self._init()
         logging.info("Database reset complete")
+        self._init()
 
 
 class SqliteData:

@@ -3,9 +3,12 @@ from typing import Literal
 
 
 class AppEvent:
-    DB_RESET = "db_reset"
-    UPDATE_THEME = "update_theme"
-    TABLE_CHANGED = "table_changed"
+    DB_RESET = "DB_RESET"
+    UPDATE_THEME = "UPDATE_THEME"
+    TABLE_CHANGED = "TABLE_CHANGED"
+    API_SUCESS = "API_SUCESS"
+    API_NO_URL = "API_NO_URL"
+    API_ERROR = "API_ERROR"
 
 
 class QuestionType(Enum):

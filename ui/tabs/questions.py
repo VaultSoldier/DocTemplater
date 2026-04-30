@@ -87,7 +87,7 @@ class EditQuestionsTabController:
         table.rows = self.build_data_rows(questions, question_type)
 
         table.update()
-        logging.info("Questions table refreshed")
+        logging.info(f"{question_type.name} table refreshed")
 
     def toggle_rows(
         self,
