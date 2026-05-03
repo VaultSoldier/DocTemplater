@@ -40,7 +40,8 @@ class DocTemplater:
 
         self.tab_edit_document.on_resize_change_dropdowns_height(dropdown_height)
         self.tab_edit_document.date_row.on_resize_change_height(dropdown_height)
-        self.tab_edit_questions.dialog_content_edit_questions.width = width * 0.75
+        self.tab_edit_questions.dialog_content_edit_questions.width = width * 0.90
+        self.tab_edit_questions.dialog_content_tables.width = width * 0.90
 
         if width < 575:
             for i in text_to_toggle:
