@@ -696,6 +696,7 @@ class EditQuestionsTabController:
             dialog.actions_padding = ft.Padding.only(
                 left=14, right=14, top=4, bottom=14
             )
+            dialog.title = None
             initial_actions.visible = False
             edit_actions.visible = True
             button_cancel.expand = 2
@@ -704,7 +705,6 @@ class EditQuestionsTabController:
 
         button_edit = StyledButton(
             ft.Text("Распределить", overflow=ft.TextOverflow.FADE, no_wrap=True),
-            icon=ft.Icons.EDIT,
             on_click=on_click_button_edit,
             expand=True,
         )
@@ -740,7 +740,8 @@ class EditQuestionsTabController:
         )
 
         dialog = StyledAlertDialog(
-            actions_padding=ft.Padding.only(left=14, right=14, top=14, bottom=14),
+            title=ft.Text("Тип вопроса", align=ft.Alignment.CENTER),
+            actions_padding=ft.Padding.only(left=14, right=14, top=0, bottom=14),
             content=self.dialog_content_tables,
             actions=[initial_actions, edit_actions],
             modal=True,
