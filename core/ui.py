@@ -13,9 +13,9 @@ def open_file(filepath: str):
         if platform.system() == "Windows":
             os.startfile(filepath)  # type: ignore[reportAttributeAccessIssue]
         elif platform.system() == "Darwin":
-            subprocess.run(["open", filepath])
+            subprocess.Popen(["open", filepath])
         else:
-            subprocess.run(["xdg-open", filepath])
+            subprocess.Popen(["xdg-open", filepath])
     except Exception as e:
         logging.error(f"Can't open file: {e}")
 

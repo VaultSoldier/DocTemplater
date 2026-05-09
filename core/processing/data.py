@@ -271,7 +271,7 @@ class SqliteData:
     def read_questions_dict(
         self,
         question_type: QuestionType,
-        order_type: OrderType = OrderType.ASC,
+        order_type: OrderType = OrderType.DESC,
     ) -> dict[int, str | int | float]:
         """
         Возвращает dict[ключ, вопрос]
