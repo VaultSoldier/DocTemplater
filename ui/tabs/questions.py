@@ -18,6 +18,7 @@ from core.table import get_selected_row_questions
 from core.types import AppEvent, QuestionType
 from ui.templates import (
     Overlay,
+    OverlayText,
     StyledAlertDialog,
     StyledButton,
     StyledSegmentedButton,
@@ -26,11 +27,6 @@ from ui.templates import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Per-table toggle state — replaces the fragile module-level bool flag.
-# A Lock ensures re-entrant on_select_change callbacks fired by flet_datatable2
-# during row rebuilds do not flip rows back.
-# ---------------------------------------------------------------------------
 @dataclass
 class _TableState:
     questions: dict[int, Any]
@@ -171,6 +167,7 @@ class EditQuestionsTabController:
         self.page.pubsub.subscribe(self.on_pubsub)
         self._warn_task = None
         self._uploading = False
+        self._next_id = 0
         self.doc_processing = Processing()
         self.text_processing = TextProcessing()
         self.sqlite = SqliteData()
@@ -261,29 +258,12 @@ class EditQuestionsTabController:
             ],
         )
 
-        button_save = StyledButton(
-            tooltip="Сохранить",
-            icon=ft.Icons.SAVE,
-            content=ft.Text(
-                value="Сохранить", overflow=ft.TextOverflow.FADE, no_wrap=True
-            ),
-            on_click=lambda _: submit(segments_questions_type.selected),
-        )
-        button_close = StyledButton(
-            tooltip="Закрыть",
-            icon=ft.Icons.CLOSE,
-            content=ft.Text(
-                value="Закрыть", overflow=ft.TextOverflow.FADE, no_wrap=True
-            ),
-            on_click=self.page.pop_dialog,
-        )
-
-        def submit(selected_type) -> None:
-            if not selected_type or not textfield.value:
+        def submit() -> None:
+            if not segments_questions_type.selected or not textfield.value:
                 return
 
             REGEX = r"^\s*\d+[.)]{1,2}\s*"
-            qtype = next(iter(selected_type))
+            qtype = next(iter(segments_questions_type.selected))
             questions_raw = textfield.value
 
             try:
@@ -298,7 +278,7 @@ class EditQuestionsTabController:
                 cleaned
                 for q in questions_raw.splitlines()
                 if (cleaned := clean_question_by_regex(REGEX, q)) != ""
-            ]
+            ][::-1]  # reverse list
 
             if not values:
                 button_save.disabled = False
@@ -314,6 +294,23 @@ class EditQuestionsTabController:
             self.refresh_table(question_type, refresh_questions=False)
             self.page.pop_dialog()
             self.page.pubsub.send_all(AppEvent.TABLE_CHANGED)
+
+        button_save = StyledButton(
+            tooltip="Сохранить",
+            icon=ft.Icons.SAVE,
+            content=ft.Text(
+                value="Сохранить", overflow=ft.TextOverflow.FADE, no_wrap=True
+            ),
+            on_click=submit,
+        )
+        button_close = StyledButton(
+            tooltip="Закрыть",
+            icon=ft.Icons.CLOSE,
+            content=ft.Text(
+                value="Закрыть", overflow=ft.TextOverflow.FADE, no_wrap=True
+            ),
+            on_click=self.page.pop_dialog,
+        )
 
         actions: List[ft.Control] = [
             ft.Row([segments_questions_type], expand=True),
@@ -339,19 +336,14 @@ class EditQuestionsTabController:
             return
         self._uploading = True
 
-        text_color = (
-            ft.Colors.GREY_800
-            if (
-                self.page.theme_mode == ft.ThemeMode.LIGHT
-                or (
-                    self.page.theme_mode == ft.ThemeMode.SYSTEM
-                    and self.page.platform_brightness == ft.Brightness.LIGHT
-                )
-            )
-            else ft.Colors.WHITE
-        )
+        color = ft.Colors.WHITE
+        if self.page.theme_mode == ft.ThemeMode.LIGHT or (
+            self.page.theme_mode == ft.ThemeMode.SYSTEM
+            and self.page.platform_brightness == ft.Brightness.LIGHT
+        ):
+            color = ft.Colors.GREY_800
 
-        overlay = Overlay(text_value="Выберите файл...", text_color=text_color)
+        overlay = Overlay(OverlayText("Выберите файл...", color=color))
         overlay.visible = True
         self.page.overlay.append(overlay)
         self.page.update()
@@ -391,12 +383,9 @@ class EditQuestionsTabController:
             self.page.show_dialog(WarnPopup("Не удалось найти данные"))
             return
 
-        _next_id = 0
-
         def next_id() -> int:
-            nonlocal _next_id
-            _next_id += 1
-            return _next_id
+            self._next_id += 1
+            return self._next_id
 
         all_questions: dict[int, str] = {next_id(): q for q in new_questions}
         practical_questions: dict[int, str] = {}
@@ -614,7 +603,7 @@ class EditQuestionsTabController:
 
             if practical_questions:
                 self.sqlite.add_list(
-                    list(practical_questions.values()), QuestionType.PRACTICAL
+                    list(practical_questions.values())[::-1], QuestionType.PRACTICAL
                 )
                 self._state_practical.questions.clear()
                 self._state_practical.questions.update(
@@ -624,7 +613,7 @@ class EditQuestionsTabController:
 
             if theoretical_questions:
                 self.sqlite.add_list(
-                    list(theoretical_questions.values()), QuestionType.THEORETICAL
+                    list(theoretical_questions.values())[::-1], QuestionType.THEORETICAL
                 )
                 self._state_theoretical.questions.clear()
                 self._state_theoretical.questions.update(
@@ -669,7 +658,7 @@ class EditQuestionsTabController:
             content=ft.Text("Отмена", overflow=ft.TextOverflow.FADE, no_wrap=True),
             icon=ft.Icons.CLOSE,
             on_click=self.page.pop_dialog,
-            expand=2,
+            expand=True,
         )
 
         self.dialog_content_tables.controls = [
@@ -677,11 +666,62 @@ class EditQuestionsTabController:
             ft.Container(table_all, expand=True),
             ft.Container(table_theoretical, expand=True),
         ]
+        self.dialog_content_tables.visible = False
 
-        dialog = StyledAlertDialog(
-            modal=True,
-            content=self.dialog_content_tables,
-            actions=[
+        def on_click_save_to(e, question_type):
+            button_practical.disabled = True
+            button_theoretical.disabled = True
+            button_practical.update()
+            button_theoretical.update()
+
+            self.sqlite.add_list(new_questions[::-1], question_type)
+            self.refresh_table(question_type, refresh_questions=True)
+            self.page.pop_dialog()
+
+        button_practical = StyledButton(
+            ft.Text("Практические", overflow=ft.TextOverflow.FADE, no_wrap=True),
+            on_click=lambda e, qtype=QuestionType.PRACTICAL: on_click_save_to(e, qtype),
+        )
+        button_theoretical = StyledButton(
+            ft.Text("Теоретические", overflow=ft.TextOverflow.FADE, no_wrap=True),
+            on_click=lambda e, qtype=QuestionType.THEORETICAL: on_click_save_to(
+                e, qtype
+            ),
+        )
+
+        def on_click_button_edit(e) -> None:
+            dialog.content_padding = ft.Padding.only(
+                left=14, right=14, top=14, bottom=0
+            )
+            dialog.actions_padding = ft.Padding.only(
+                left=14, right=14, top=4, bottom=14
+            )
+            initial_actions.visible = False
+            edit_actions.visible = True
+            button_cancel.expand = 2
+            self.dialog_content_tables.visible = True
+            self.page.update()
+
+        button_edit = StyledButton(
+            ft.Text("Распределить", overflow=ft.TextOverflow.FADE, no_wrap=True),
+            icon=ft.Icons.EDIT,
+            on_click=on_click_button_edit,
+            expand=True,
+        )
+
+        initial_actions = ft.Column(
+            controls=[
+                ft.Row([button_practical, button_theoretical]),
+                ft.Row([button_edit]),
+                ft.Row([button_cancel]),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            expand=True,
+            visible=True,
+        )
+
+        edit_actions = ft.Column(
+            controls=[
                 warn_container,
                 ft.Row(
                     controls=[
@@ -695,7 +735,18 @@ class EditQuestionsTabController:
                     alignment=ft.MainAxisAlignment.CENTER,
                 ),
             ],
+            expand=True,
+            visible=False,
         )
+
+        dialog = StyledAlertDialog(
+            actions_padding=ft.Padding.only(left=14, right=14, top=14, bottom=14),
+            content=self.dialog_content_tables,
+            actions=[initial_actions, edit_actions],
+            modal=True,
+            expand=True,
+        )
+
         self.page.show_dialog(dialog)
 
     def delete_question_by_type(self, question_type: QuestionType) -> None:
@@ -910,8 +961,11 @@ class EditQuestionsTabController:
             ],
         )
 
-        def on_click_save(e) -> None:
-            values = [tf.value.strip() for tf, _ in textfields if tf.value.strip()]
+        def on_click_save(e: ft.Event[ft.Button]) -> None:
+            values = [tf.value.strip() for tf, _ in textfields if tf.value.strip()][
+                ::-1
+            ]  # reverse list
+
             if not values or not segments_qtype.selected:
                 return
 

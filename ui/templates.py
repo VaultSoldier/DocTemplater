@@ -12,6 +12,7 @@ from flet import (
     Control,
     ControlEventHandler,
     Dropdown,
+    FontWeight,
     Icon,
     IconDataOrControl,
     InputFilter,
@@ -22,17 +23,37 @@ from flet import (
     PaddingValue,
     Segment,
     StrOrControl,
+    TextAlign,
 )
 from flet.controls.alignment import Axis
 from flet.controls.material.dropdown import DropdownOption
 
 
+class OverlayText(ft.Text):
+    def __init__(
+        self,
+        value: str = "",
+        size: Optional[Number] = 32,
+        color: Optional[ColorValue] = None,
+        bgcolor: Optional[ColorValue] = None,
+        text_align: TextAlign = TextAlign.CENTER,
+        weight: Optional[FontWeight] = FontWeight.BOLD,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.value = value
+        self.size = size
+        self.color = color
+        self.bgcolor = bgcolor
+        self.text_align = text_align
+        self.weight = weight
+
+
 class Overlay(ft.Container):
     def __init__(
         self,
-        text_value: str,
-        text_size: Number = 32,
-        text_color: Optional[ColorValue] = None,
         content: Optional[Control] = None,
         bgcolor: Optional[ColorValue] = None,
         blend_mode=ft.BlendMode.OVERLAY,
@@ -45,14 +66,8 @@ class Overlay(ft.Container):
     ):
         super().__init__(*args, **kwargs)
 
-        text = ft.Text(
-            text_value,
-            text_align=ft.TextAlign.CENTER,
-            weight=ft.FontWeight.BOLD,
-            size=text_size,
-            color=text_color,
-        )
-        self.content = content or text
+        self.expand = True
+        self.content = content
         self.bgcolor = bgcolor
         self.blend_mode = blend_mode
         self.blur = blur
@@ -452,9 +467,13 @@ class StyledAlertDialog(ft.AlertDialog):
     def __init__(
         self,
         shape: Optional[OutlinedBorder] = ft.RoundedRectangleBorder(radius=9),
-        content_padding=ft.Padding.only(left=14, right=14, top=14, bottom=0),
-        actions_padding=ft.Padding.only(left=14, right=14, top=4, bottom=14),
-        action_button_padding: Optional[PaddingValue] = 10,
+        content_padding: Optional[PaddingValue] = ft.Padding.only(
+            left=14, right=14, top=14, bottom=0
+        ),
+        actions_padding: Optional[PaddingValue] = ft.Padding.only(
+            left=14, right=14, top=4, bottom=14
+        ),
+        action_button_padding: Optional[PaddingValue] = ft.Padding.all(10),
         actions_alignment: Optional[MainAxisAlignment] = MainAxisAlignment.CENTER,
         *args,
         **kwargs,

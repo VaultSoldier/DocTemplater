@@ -1,3 +1,4 @@
+import asyncio
 import datetime as dt
 import locale
 import logging
@@ -8,12 +9,13 @@ from anyio import Path
 
 from config import config
 from core.processing.data import SqliteData
-from core.processing.docx import DocxProcessingError, Processing
+from core.processing.docx import DocxProcessingCancel, DocxProcessingError, Processing
 from core.types import AppEvent, QuestionType
 from core.ui import open_file
 from ui.templates import (
     DateRow,
     Overlay,
+    OverlayText,
     StyledAlertDialog,
     StyledButton,
     StyledDropdown,
@@ -285,7 +287,8 @@ class TabEditDocument:
         elif self.page.theme_mode == ft.ThemeMode.LIGHT:
             text_color = ft.Colors.GREY_800
 
-        overlay = Overlay(text_value="Сохраните документ...", text_color=text_color)
+        overlay_text = OverlayText("Сохраните документ...", color=text_color)
+        overlay = Overlay(overlay_text)
         overlay.visible = True
         self.page.overlay.append(overlay)
         self.page.update()
@@ -296,7 +299,6 @@ class TabEditDocument:
         def remove_overlay():
             self._uploading = False
             overlay.visible = False
-            overlay.update()
             self.page.overlay.remove(overlay)
             self.page.update()
 
@@ -307,21 +309,40 @@ class TabEditDocument:
         if not save_file_path.lower().endswith(".docx"):
             save_file_path = f"{save_file_path}.docx"
 
-        text = ft.Text(
+        def on_click_button_cancel(e):
+            self.docx_processing.cancel()
+
+        text_cancel = ft.Text("Отмена", text_align=ft.TextAlign.CENTER)
+        button_cancel = StyledButton(
+            text_cancel, on_click=on_click_button_cancel, expand=False
+        )
+        text_loading = ft.Text(
             "Документ создается...",
             size=32,
             weight=ft.FontWeight.BOLD,
             text_align=ft.TextAlign.CENTER,
         )
-        loading_ui = ft.Column(
-            alignment=ft.MainAxisAlignment.CENTER,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            controls=[text, ft.ProgressRing()],
+        loading_ui = ft.Stack(
+            expand=True,
+            controls=[
+                ft.Column(
+                    expand=True,
+                    align=ft.Alignment.CENTER,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[text_loading, ft.ProgressRing()],
+                ),
+                ft.Container(
+                    content=button_cancel,
+                    alignment=ft.Alignment.BOTTOM_CENTER,
+                    padding=ft.Padding.only(bottom=32),
+                    expand=True,
+                ),
+            ],
         )
 
         overlay.content = loading_ui
-        overlay.visible = True
-        self.page.update()
+        overlay.update()
 
         tickets_count_type = str(next(iter(self.segmented_button_ticket_num.selected)))
         practical_rnd_type = str(next(iter(self.segmented_btn_practical.selected)))
@@ -331,21 +352,28 @@ class TabEditDocument:
         if self.textfield_ticket_number.value:
             tickets_count = int(self.textfield_ticket_number.value)
 
+        loop = asyncio.get_event_loop()
         try:
-            # TODO: Implement abort document generation
-            response = self.docx_processing.process_docx(
-                save_to=save_file_path,
-                subject=(self.dropdown_textfield_subject.text or ""),
-                spec=(self.dropdown_textfield_spec.text or ""),
-                cmk=(self.dropdown_textfield_cmk.text or ""),
-                tutor=(self.dropdown_textfield_tutor.text or ""),
-                date=(self.date_row.value),
-                qualify_status=self.checkbox_qualifying.value,
-                tickets_count=tickets_count,
-                tickets_count_type=tickets_count_type,
-                practical_rnd_type=practical_rnd_type,
-                theoretical_rnd_type=theoretical_rnd_type,
+            await loop.run_in_executor(
+                None,
+                lambda: self.docx_processing.process_docx(
+                    save_to=save_file_path,
+                    subject=(self.dropdown_textfield_subject.text or ""),
+                    spec=(self.dropdown_textfield_spec.text or ""),
+                    cmk=(self.dropdown_textfield_cmk.text or ""),
+                    tutor=(self.dropdown_textfield_tutor.text or ""),
+                    date=(self.date_row.value),
+                    qualify_status=self.checkbox_qualifying.value,
+                    tickets_count=tickets_count,
+                    tickets_count_type=tickets_count_type,
+                    practical_rnd_type=practical_rnd_type,
+                    theoretical_rnd_type=theoretical_rnd_type,
+                ),
             )
+        except DocxProcessingCancel:
+            remove_overlay()
+            self.page.show_dialog(WarnPopup("Генерация отменена"))
+            return
         except DocxProcessingError as error:
             remove_overlay()
             self.page.show_dialog(WarnPopup(str(error)))
@@ -354,13 +382,6 @@ class TabEditDocument:
 
         self.show_dialog_generation_complete(save_file_path)
         remove_overlay()
-
-        if not response:
-            return
-
-        self.page.run_thread(
-            lambda: self.docx_processing.clean(path=response[0], paths=response[1])
-        )
 
     def show_dialog_generation_complete(self, filepath: str) -> None:
         dialog = StyledAlertDialog(
