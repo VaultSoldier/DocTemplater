@@ -236,64 +236,57 @@ class EditQuestionsTabController:
         logging.info(f"{question_type.name} table refreshed")
 
     def on_click_paste(self, e) -> None:
-        textfield = ft.TextField(
+        textfield_pracical_questions = ft.TextField(
             multiline=True,
             autofocus=True,
             min_lines=10,
-            hint_text="Один вопрос — Одна строка. Вопросы разделяются через Enter.",
+            hint_text="Практические вопросы.\n\nОдин вопрос — Одна строка.\nВопросы разделяются через Enter.",
         )
-        segments_questions_type = StyledSegmentedButton(
-            selected=[QuestionType.PRACTICAL.value],
-            segments=[
-                ft.Segment(
-                    label=ft.Text("Практические"),
-                    value=QuestionType.PRACTICAL.value,
-                    expand=True,
-                ),
-                ft.Segment(
-                    label=ft.Text("Теоретические"),
-                    value=QuestionType.THEORETICAL.value,
-                    expand=True,
-                ),
-            ],
+        textfield_theoretical_questions = ft.TextField(
+            multiline=True,
+            autofocus=True,
+            min_lines=10,
+            hint_text="Теоретические вопросы.\n\nОдин вопрос — Одна строка.\nВопросы разделяются через Enter.",
         )
 
         def submit() -> None:
-            if not segments_questions_type.selected or not textfield.value:
+            if (
+                not textfield_pracical_questions.value
+                and not textfield_theoretical_questions.value
+            ):
                 return
 
             REGEX = r"^\s*\d+[.)]{1,2}\s*"
-            qtype = next(iter(segments_questions_type.selected))
-            questions_raw = textfield.value
-
-            try:
-                question_type = QuestionType(qtype)
-            except ValueError:
-                return
+            questions_practical_raw = textfield_pracical_questions.value
+            questions_theoretical_raw = textfield_theoretical_questions.value
 
             button_save.disabled = True
             button_save.update()
 
-            values = [
-                cleaned
-                for q in questions_raw.splitlines()
-                if (cleaned := clean_question_by_regex(REGEX, q)) != ""
-            ][::-1]  # reverse list
+            questions_practical_values = None
+            questions_theoretical_values = None
 
-            if not values:
-                button_save.disabled = False
-                button_save.update()
-                return
+            if questions_practical_raw:
+                questions_practical_values = [
+                    cleaned
+                    for question in questions_practical_raw.splitlines()
+                    if (cleaned := clean_question_by_regex(REGEX, question)) != ""
+                ][::-1]  # reverse list
+                self.sqlite.add_list(questions_practical_values, QuestionType.PRACTICAL)
+                self.refresh_table(QuestionType.PRACTICAL)
+                logging.info(f"Сохранённые практические: {questions_practical_values}")
+            if questions_theoretical_raw:
+                questions_theoretical_values = [
+                    cleaned
+                    for question in questions_theoretical_raw.splitlines()
+                    if (cleaned := clean_question_by_regex(REGEX, question)) != ""
+                ][::-1]  # reverse list
+                self.sqlite.add_list(questions_theoretical_values, QuestionType.THEORETICAL)
+                self.refresh_table(QuestionType.THEORETICAL)
+                logging.info(f"Сохранённые теоретические: {questions_theoretical_values}")
 
-            state, _ = self._get_type_state(question_type)
-            self.sqlite.add_list(values, question_type)
-            logging.info(f"Сохранённые значения: {values}")
-
-            state.questions.clear()
-            state.questions.update(self.sqlite.read_questions_dict(question_type))
-            self.refresh_table(question_type, refresh_questions=False)
-            self.page.pop_dialog()
             self.page.pubsub.send_all(AppEvent.TABLE_CHANGED)
+            self.page.pop_dialog()
 
         button_save = StyledButton(
             tooltip="Сохранить",
@@ -313,14 +306,19 @@ class EditQuestionsTabController:
         )
 
         actions: List[ft.Control] = [
-            ft.Row([segments_questions_type], expand=True),
             ft.Row([button_save, button_close]),
         ]
         dialog = StyledAlertDialog(
-            modal=True,
             actions_padding=ft.Padding.only(left=14, right=14, top=12, bottom=14),
+            modal=True,
         )
-        dialog.content = ft.Container(textfield)
+        dialog.content = ft.Row(
+            [
+                ft.Container(textfield_pracical_questions, expand=True),
+                ft.Container(textfield_theoretical_questions, expand=True),
+            ],
+            expand=True,
+        )
         dialog.actions = [ft.Column(actions)]
         self.page.show_dialog(dialog)
 
