@@ -70,16 +70,16 @@ class TabEditDocument:
         self.checkbox_qualifying = ft.Checkbox(label="Квалификационные билеты")
 
         year = dt.date.today().year
-        date_picker = ft.DatePicker(
+        self.date_picker = ft.DatePicker(
             first_date=dt.date(year - 20, 1, 1),
             last_date=dt.date(year + 2, 12, 31),
             on_change=self.on_change_date_picker,
         )
-        self.page.overlay.append(date_picker)
+        self.page.overlay.append(self.date_picker)
 
         self.date_row = DateRow(
             page=self.page,
-            date_picker=date_picker,
+            date_picker=self.date_picker,
             on_select=self.on_select_date_row,
         )
 
@@ -180,9 +180,9 @@ class TabEditDocument:
             "ноября",
             "декабря",
         ]
-        date = e.control.value
+        date = e.control.value.astimezone().date()
 
-        formatted = f"{date.year}.{MONTHS_RU_GEN[date.month]}.{date.day}".split(".")
+        formatted = [str(date.year), MONTHS_RU_GEN[date.month], str(date.day)]
         logging.info(formatted)
 
         self.date_row.value = formatted
