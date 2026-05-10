@@ -1,6 +1,6 @@
 import calendar
 import datetime as dt
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union
 
 import flet as ft
 from babel.dates import format_date
@@ -84,9 +84,7 @@ class DateRow(ft.Container):
     ]
     dt_format = "%Y,%B,%d,%H,%M"
 
-    def __init__(
-        self, page: ft.Page, date_picker: ft.DatePicker, on_select: Callable
-    ) -> None:
+    def __init__(self, page: ft.Page, date_picker: ft.DatePicker) -> None:
         self._page = page
 
         if (ft.Page.height or 0) > 575:
@@ -99,7 +97,7 @@ class DateRow(ft.Container):
         self.border_radius = 0
         self.padding = 0
         self.expand = True
-        self.on_select = on_select or (lambda x: None)
+        self.date_picker = date_picker
 
         self._years()
         self._months()
@@ -114,7 +112,7 @@ class DateRow(ft.Container):
                 self.date_controls_dict["years"],
                 self.date_controls_dict["months"],
                 self.date_controls_dict["days"],
-                self._calendar_button(date_picker),
+                self._calendar_button(),
             ],
             spacing=0,
         )
@@ -130,7 +128,7 @@ class DateRow(ft.Container):
             i.menu_height = height
             i.update()
 
-    def _calendar_button(self, date_picker):
+    def _calendar_button(self):
         button_style = ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(
                 side=ft.BorderSide(color="#7799b8"),
@@ -142,7 +140,7 @@ class DateRow(ft.Container):
             icon=ft.Icons.DATE_RANGE,
             height=38,
             style=button_style,
-            on_click=lambda: self._page.show_dialog(date_picker),
+            on_click=lambda: self._page.show_dialog(self.date_picker),
         )
         return button
 
@@ -194,21 +192,31 @@ class DateRow(ft.Container):
         )
 
     def _on_select(self, e) -> None:
-        self.on_select(self.value)
         year = int(self.date_controls_dict["years"].value)
         month = self.months_.index(self.date_controls_dict["months"].value) + 1
-        max_day = calendar.monthrange(year, month)[1]
+
+        day_max = calendar.monthrange(year, month)[1]
         days_dd = self.date_controls_dict["days"]
-        days_dd.options = [ft.dropdown.Option(str(d)) for d in range(1, max_day + 1)]
+        days_dd.options = [
+            ft.dropdown.Option(str(day)) for day in range(1, day_max + 1)
+        ]
+
         prev = days_dd.value
 
         try:
-            prev_int = int(prev) if prev is not None else max_day
+            prev_int = int(prev) if prev is not None else day_max
         except ValueError:
-            prev_int = max_day
-        days_dd.value = str(min(prev_int, max_day))
+            prev_int = day_max
 
-        self._page.update
+        days_dd.value = str(min(prev_int, day_max))
+
+        day_int = min(prev_int, day_max)
+        days_dd.value = str(day_int)
+
+        self.date_picker.value = dt.datetime(year, month, day_int)
+        self.date_picker.update()
+
+        self._page.update()
 
     @property
     def value(self) -> list:
@@ -233,7 +241,7 @@ class DateRow(ft.Container):
         if not year_val or not month_val:
             days_dd.options = []
             days_dd.value = None
-            self._page.update
+            self._page.update()
             return
 
         try:
@@ -251,7 +259,7 @@ class DateRow(ft.Container):
 
         if day_val is None:
             days_dd.value = None
-            self._page.update
+            self._page.update()
             return
 
         try:
@@ -259,7 +267,7 @@ class DateRow(ft.Container):
             days_dd.value = str(day_int) if 1 <= day_int <= num_days else None
         except ValueError:
             days_dd.value = None
-        self._page.update
+        self._page.update()
 
 
 class StyledSegmentedButton(ft.SegmentedButton):

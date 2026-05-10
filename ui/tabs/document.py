@@ -76,12 +76,7 @@ class TabEditDocument:
             on_change=self.on_change_date_picker,
         )
         self.page.overlay.append(self.date_picker)
-
-        self.date_row = DateRow(
-            page=self.page,
-            date_picker=self.date_picker,
-            on_select=self.on_select_date_row,
-        )
+        self.date_row = DateRow(page=self.page, date_picker=self.date_picker)
 
         self.button_create = StyledButton(
             tooltip="Создать билет(ы)",
@@ -159,10 +154,6 @@ class TabEditDocument:
                 self.on_change_validate()
             case AppEvent.TABLE_CHANGED:
                 self.on_change_validate()
-
-    # TODO: IMPLEMENT DATEPICKER CHANGE DATE ON DATEROW UPDATE
-    def on_select_date_row(self, e) -> None:
-        pass
 
     def on_change_date_picker(self, e) -> None:
         MONTHS_RU_GEN = [
