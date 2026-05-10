@@ -21,6 +21,7 @@ from ui.templates import (
     OverlayText,
     StyledAlertDialog,
     StyledButton,
+    StyledIconButton,
     StyledSegmentedButton,
     StyledTextField,
     WarnPopup,
@@ -42,6 +43,7 @@ def _make_table(
     label: str | ft.Control,
     question_type: QuestionType,
     sqlite: SqliteData,
+    page: ft.Page,
 ) -> fdt.DataTable2:
     table = fdt.DataTable2(
         show_checkbox_column=True,
@@ -51,19 +53,31 @@ def _make_table(
         horizontal_margin=12,
         heading_row_height=40,
         data_row_height=38,
+        checkbox_horizontal_margin=4,
         expand=True,
+        sm_ratio=0.15,
+        min_width=0,
         columns=[
             fdt.DataColumn2(
-                fixed_width=32,
-                heading_row_alignment=ft.MainAxisAlignment.START,
-                label=ft.Text("№", overflow=ft.TextOverflow.FADE, no_wrap=True),
+                fixed_width=50,
                 numeric=True,
+                heading_row_alignment=ft.MainAxisAlignment.START,
+                label=ft.Text(
+                    "№",
+                    overflow=ft.TextOverflow.FADE,
+                    no_wrap=True,
+                ),
             ),
-            fdt.DataColumn2(label=label),
+            fdt.DataColumn2(
+                size=fdt.DataColumnSize.L,
+                label=label,
+                heading_row_alignment=ft.MainAxisAlignment.START,
+            ),
         ],
     )
     table.on_select_all = lambda e: _toggle_rows(
         e,
+        page=page,
         state=state,
         table=table,
         sqlite=sqlite,
@@ -71,10 +85,7 @@ def _make_table(
         question_id=None,
     )
     table.rows = _build_data_rows(
-        state=state,
-        question_type=question_type,
-        table=table,
-        sqlite=sqlite,
+        state=state, question_type=question_type, table=table, sqlite=sqlite, page=page
     )
     return table
 
@@ -84,10 +95,57 @@ def _build_data_rows(
     question_type: QuestionType,
     table: fdt.DataTable2,
     sqlite: SqliteData,
+    page: ft.Page,
 ) -> list[ft.DataRow]:
     rows: list[ft.DataRow] = []
-
     for index, (question_id, question) in enumerate(list(state.questions.items())):
+
+        def on_edit(e, rid=question_id, question_text=question) -> None:
+            textfield = StyledTextField(
+                value=question_text, multiline=True, autofocus=True, expand=True
+            )
+
+            def on_save(_e) -> None:
+                new_value = textfield.value.strip()
+                if not new_value:
+                    return
+                state.questions[rid] = new_value
+                sqlite.edit_questions({rid: new_value})
+                table.rows = _build_data_rows(state, question_type, table, sqlite, page)
+                table.update()
+                page.pop_dialog()
+
+            dialog_edit = StyledAlertDialog(
+                modal=True,
+                actions_padding=ft.Padding.all(14),
+                content=textfield,
+                actions=[
+                    ft.Row(
+                        [
+                            StyledButton(
+                                content=ft.Text(
+                                    "Сохранить",
+                                    overflow=ft.TextOverflow.FADE,
+                                    no_wrap=True,
+                                ),
+                                icon=ft.Icons.SAVE,
+                                on_click=on_save,
+                            ),
+                            StyledButton(
+                                content=ft.Text(
+                                    "Закрыть",
+                                    overflow=ft.TextOverflow.FADE,
+                                    no_wrap=True,
+                                ),
+                                icon=ft.Icons.CLOSE,
+                                on_click=page.pop_dialog,
+                            ),
+                        ]
+                    )
+                ],
+            )
+            page.show_dialog(dialog_edit)
+
         row = fdt.DataRow2(
             cells=[
                 ft.DataCell(
@@ -99,11 +157,24 @@ def _build_data_rows(
                     )
                 ),
                 ft.DataCell(
-                    ft.Text(
-                        value=str(question),
-                        tooltip=str(question),
-                        overflow=ft.TextOverflow.FADE,
-                        no_wrap=True,
+                    ft.Row(
+                        [
+                            ft.Text(
+                                value=str(question),
+                                tooltip=str(question),
+                                overflow=ft.TextOverflow.FADE,
+                                no_wrap=True,
+                                expand=True,
+                            ),
+                            StyledIconButton(
+                                ft.Icons.EDIT,
+                                expand=False,
+                                width=40,
+                                on_click=on_edit,
+                                # margin=ft.Margin.only(right=7),
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     )
                 ),
             ],
@@ -112,6 +183,7 @@ def _build_data_rows(
         )
         row.on_select_change = lambda e, rid=question_id: _toggle_rows(
             e,
+            page=page,
             state=state,
             table=table,
             sqlite=sqlite,
@@ -119,12 +191,12 @@ def _build_data_rows(
             question_id=rid,
         )
         rows.append(row)
-
     return rows
 
 
 def _toggle_rows(
     e,
+    page: ft.Page,
     state: "_TableState",
     table: fdt.DataTable2,
     sqlite: SqliteData,
@@ -150,6 +222,7 @@ def _toggle_rows(
             question_type=question_type,
             table=table,
             sqlite=sqlite,
+            page=page,
         )
         table.update()
     finally:
@@ -227,6 +300,7 @@ class EditQuestionsTabController:
         state.selected.update({idx: False for idx in state.questions})
 
         table.rows = _build_data_rows(
+            page=self.page,
             state=state,
             question_type=question_type,
             table=table,
@@ -281,9 +355,13 @@ class EditQuestionsTabController:
                     for question in questions_theoretical_raw.splitlines()
                     if (cleaned := clean_question_by_regex(REGEX, question)) != ""
                 ][::-1]  # reverse list
-                self.sqlite.add_list(questions_theoretical_values, QuestionType.THEORETICAL)
+                self.sqlite.add_list(
+                    questions_theoretical_values, QuestionType.THEORETICAL
+                )
                 self.refresh_table(QuestionType.THEORETICAL)
-                logging.info(f"Сохранённые теоретические: {questions_theoretical_values}")
+                logging.info(
+                    f"Сохранённые теоретические: {questions_theoretical_values}"
+                )
 
             self.page.pubsub.send_all(AppEvent.TABLE_CHANGED)
             self.page.pop_dialog()
@@ -405,17 +483,20 @@ class EditQuestionsTabController:
                 heading_row_height=40,
                 data_row_height=38,
                 expand=True,
+                min_width=0,
+                sm_ratio=0.15,
                 columns=[
                     fdt.DataColumn2(
-                        fixed_width=32,
+                        fixed_width=50,
                         heading_row_alignment=ft.MainAxisAlignment.START,
                         label=ft.Text("№", overflow=ft.TextOverflow.FADE, no_wrap=True),
                         numeric=True,
                     ),
                     fdt.DataColumn2(
+                        size=fdt.DataColumnSize.L,
                         label=ft.Text(
                             label, overflow=ft.TextOverflow.FADE, no_wrap=True
-                        )
+                        ),
                     ),
                 ],
             )
@@ -426,12 +507,13 @@ class EditQuestionsTabController:
             table: fdt.DataTable2,
         ) -> list[ft.DataRow]:
             rows: list[ft.DataRow] = []
-            for display_idx, (qid, text) in enumerate(list(questions.items())):
+            for display_idx, (question_id, text) in enumerate(list(questions.items())):
                 textfield = StyledTextField(
                     border=ft.InputBorder.UNDERLINE,
-                    data=qid,
+                    data=question_id,
                     value=text,
                     dense=False,
+                    expand=True,
                     height=38,
                     content_padding=ft.Padding(0, -9),
                     on_change=lambda ev, q=questions: q.update(
@@ -449,11 +531,11 @@ class EditQuestionsTabController:
                         ),
                         ft.DataCell(textfield),
                     ],
-                    data=qid,
-                    selected=selected.get(qid, False),
+                    data=question_id,
+                    selected=selected.get(question_id, False),
                 )
                 row.on_select_change = (
-                    lambda ev, rid=qid, sel=selected, t=table, q=questions: (
+                    lambda ev, rid=question_id, sel=selected, t=table, q=questions: (
                         _toggle_upload_row(rid, sel, t, q)
                     )
                 )
@@ -738,7 +820,7 @@ class EditQuestionsTabController:
         )
 
         dialog = StyledAlertDialog(
-            title=ft.Text("Тип вопроса", align=ft.Alignment.CENTER),
+            title=ft.Text("Тип вопросов", align=ft.Alignment.CENTER),
             actions_padding=ft.Padding.only(left=14, right=14, top=0, bottom=14),
             content=self.dialog_content_tables,
             actions=[initial_actions, edit_actions],
@@ -786,16 +868,21 @@ class EditQuestionsTabController:
             horizontal_margin=12,
             heading_row_height=40,
             data_row_height=38,
+            min_width=0,
+            sm_ratio=0.15,
             columns=[
                 fdt.DataColumn2(
-                    fixed_width=32,
+                    fixed_width=50,
                     heading_row_alignment=ft.MainAxisAlignment.START,
                     label=ft.Text(
                         value="№", overflow=ft.TextOverflow.FADE, no_wrap=True
                     ),
                     numeric=True,
                 ),
-                fdt.DataColumn2(label=label),
+                fdt.DataColumn2(
+                    label=label,
+                    size=fdt.DataColumnSize.L,
+                ),
             ],
         )
 
@@ -1048,12 +1135,14 @@ class TabEditQuestions(EditQuestionsTabController):
         super().__init__(page, table_practical=None, table_theoretical=None)
 
         self.table_practical = _make_table(
+            page=page,
             state=self._state_practical,
             label=ft.Text("Практические", overflow=ft.TextOverflow.FADE, no_wrap=True),
             question_type=QuestionType.PRACTICAL,
             sqlite=self.sqlite,
         )
         self.table_theoretical = _make_table(
+            page=page,
             state=self._state_theoretical,
             label=ft.Text("Теоретические", overflow=ft.TextOverflow.FADE, no_wrap=True),
             question_type=QuestionType.THEORETICAL,
