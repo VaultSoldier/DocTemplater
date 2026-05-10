@@ -157,7 +157,7 @@ def main(page: ft.Page):
     page.title = "DocTemplater"
     page.window.icon = "Logo.ico"
     page.padding = 0
-    page.window.min_width = 300
+    page.window.min_width = 350
     page.window.min_height = 400
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
 
