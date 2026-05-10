@@ -171,7 +171,6 @@ def _build_data_rows(
                                 expand=False,
                                 width=40,
                                 on_click=on_edit,
-                                # margin=ft.Margin.only(right=7),
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -962,11 +961,18 @@ class EditQuestionsTabController:
             fillout_questions(QuestionType.THEORETICAL)
 
         def on_click_button_save(
-            tables_questions: dict[QuestionType, dict[int, str]], e
+            tables_type_and_questions: dict[QuestionType, dict[int, str]], e
         ) -> None:
-            for qtype, questions in tables_questions.items():
-                self.sqlite.edit_questions(questions)
-                self.refresh_table(qtype)
+            for question_type, table_questions in tables_type_and_questions.items():
+                tables_type_and_questions[question_type] = {
+                    question_id: question
+                    for question_id, question in table_questions.items()
+                    if question and question.strip()
+                }
+
+            for question_type, table_questions in tables_type_and_questions.items():
+                self.sqlite.edit_questions(table_questions)
+                self.refresh_table(question_type)
             self.page.pop_dialog()
 
         button_save = StyledButton(
