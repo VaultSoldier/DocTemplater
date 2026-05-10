@@ -13,16 +13,22 @@ def open_file(filepath: str):
         if platform.system() == "Windows":
             os.startfile(filepath)  # type: ignore[reportAttributeAccessIssue]
         elif platform.system() == "Darwin":
-            subprocess.Popen(["open", filepath])
+            subprocess.Popen(
+                ["open", filepath],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
         else:
-            subprocess.Popen(["xdg-open", filepath])
+            subprocess.Popen(
+                ["xdg-open", filepath],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
     except Exception as e:
-        logging.error(f"Can't open file: {e}")
+        logging.exception(f"Can't open file: {e}")
 
 
-def load_theme(
-    icon_button: ft.IconButton, page: ft.Page, app_settings: AppSettings
-):
+def load_theme(icon_button: ft.IconButton, page: ft.Page, app_settings: AppSettings):
     current_theme = app_settings.load().get("theme_mode", "system")
 
     theme_map = {
