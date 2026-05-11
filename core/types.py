@@ -2,6 +2,15 @@ from enum import Enum
 from typing import Literal
 
 
+class AppEvent:
+    DB_RESET = "DB_RESET"
+    UPDATE_THEME = "UPDATE_THEME"
+    TABLE_CHANGED = "TABLE_CHANGED"
+    API_SYNCED = "API_SUCESS"
+    API_NO_URL = "API_NO_URL"
+    API_ERROR = "API_ERROR"
+
+
 class QuestionType(Enum):
     THEORETICAL = "theory"
     PRACTICAL = "practice"

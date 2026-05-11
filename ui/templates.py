@@ -1,6 +1,6 @@
 import calendar
 import datetime as dt
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union
 
 import flet as ft
 from babel.dates import format_date
@@ -11,26 +11,51 @@ from flet import (
     ColorValue,
     Control,
     ControlEventHandler,
+    Dropdown,
+    FontWeight,
     Icon,
     IconDataOrControl,
     InputFilter,
     MainAxisAlignment,
+    MenuStyle,
     Number,
     OutlinedBorder,
     PaddingValue,
     Segment,
+    StrOrControl,
+    TextAlign,
 )
 from flet.controls.alignment import Axis
+from flet.controls.material.dropdown import DropdownOption
+
+
+class OverlayText(ft.Text):
+    def __init__(
+        self,
+        value: str = "",
+        size: Optional[Number] = 32,
+        color: Optional[ColorValue] = None,
+        bgcolor: Optional[ColorValue] = None,
+        text_align: TextAlign = TextAlign.CENTER,
+        weight: Optional[FontWeight] = FontWeight.BOLD,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.value = value
+        self.size = size
+        self.color = color
+        self.bgcolor = bgcolor
+        self.text_align = text_align
+        self.weight = weight
 
 
 class Overlay(ft.Container):
     def __init__(
         self,
-        text_value: str = "Выберите файл...",
-        text_size: Number = 32,
-        text_color: Optional[ColorValue] = "",
         content: Optional[Control] = None,
-        bgcolor: Optional[ColorValue] = "dark",
+        bgcolor: Optional[ColorValue] = None,
         blend_mode=ft.BlendMode.OVERLAY,
         blur: Union[
             None, float, int, Tuple[Union[float, int], Union[float, int]], Blur
@@ -41,14 +66,8 @@ class Overlay(ft.Container):
     ):
         super().__init__(*args, **kwargs)
 
-        text = ft.Text(
-            text_value,
-            text_align=ft.TextAlign.CENTER,
-            weight=ft.FontWeight.BOLD,
-            size=text_size,
-            color=text_color,
-        )
-        self.content = content or text
+        self.expand = True
+        self.content = content
         self.bgcolor = bgcolor
         self.blend_mode = blend_mode
         self.blur = blur
@@ -65,9 +84,7 @@ class DateRow(ft.Container):
     ]
     dt_format = "%Y,%B,%d,%H,%M"
 
-    def __init__(
-        self, page: ft.Page, date_picker: ft.DatePicker, on_select: Callable
-    ) -> None:
+    def __init__(self, page: ft.Page, date_picker: ft.DatePicker) -> None:
         self._page = page
 
         if (ft.Page.height or 0) > 575:
@@ -76,11 +93,11 @@ class DateRow(ft.Container):
             self.menu_height = None
 
         super().__init__()
-        self.border = ft.Border.all(1, color="#7799b8")
-        self.border_radius = 1
+        self.border = None
+        self.border_radius = 0
         self.padding = 0
         self.expand = True
-        self.on_select = on_select or (lambda x: None)
+        self.date_picker = date_picker
 
         self._years()
         self._months()
@@ -95,7 +112,7 @@ class DateRow(ft.Container):
                 self.date_controls_dict["years"],
                 self.date_controls_dict["months"],
                 self.date_controls_dict["days"],
-                self._calendar_button(date_picker),
+                self._calendar_button(),
             ],
             spacing=0,
         )
@@ -107,21 +124,25 @@ class DateRow(ft.Container):
         }
 
     def on_resize_change_height(self, height: float):
-        height = height * 0.45
-        for dd in self.date_controls_dict.values():
-            dd.menu_height = height
-            dd.update()
+        for i in self.date_controls_dict.values():
+            i.menu_height = height
+            i.update()
 
-    def _calendar_button(self, date_picker):
-        return ft.IconButton(
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=9),
-                bgcolor="",
+    def _calendar_button(self):
+        button_style = ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(
+                side=ft.BorderSide(color="#7799b8"),
+                radius=0,
             ),
-            height=38,
-            icon=ft.Icons.DATE_RANGE,
-            on_click=lambda _: self._page.show_dialog(date_picker),
+            bgcolor="",
         )
+        button = ft.IconButton(
+            icon=ft.Icons.DATE_RANGE,
+            height=38,
+            style=button_style,
+            on_click=lambda: self._page.show_dialog(self.date_picker),
+        )
+        return button
 
     def _years(self) -> None:
         year = dt.date.today().year
@@ -161,6 +182,8 @@ class DateRow(ft.Container):
         """
         self.date_controls_dict[name] = ft.Dropdown(
             options=[ft.dropdown.Option(x) for x in elements],
+            border_radius=ft.BorderRadius.all(0),
+            border_color="#7799b8",
             menu_style=ft.MenuStyle(padding=0, visual_density=ft.VisualDensity.COMPACT),
             height=38,
             expand=True,
@@ -169,21 +192,31 @@ class DateRow(ft.Container):
         )
 
     def _on_select(self, e) -> None:
-        self.on_select(self.value)
         year = int(self.date_controls_dict["years"].value)
         month = self.months_.index(self.date_controls_dict["months"].value) + 1
-        max_day = calendar.monthrange(year, month)[1]
+
+        day_max = calendar.monthrange(year, month)[1]
         days_dd = self.date_controls_dict["days"]
-        days_dd.options = [ft.dropdown.Option(str(d)) for d in range(1, max_day + 1)]
+        days_dd.options = [
+            ft.dropdown.Option(str(day)) for day in range(1, day_max + 1)
+        ]
+
         prev = days_dd.value
 
         try:
-            prev_int = int(prev) if prev is not None else max_day
+            prev_int = int(prev) if prev is not None else day_max
         except ValueError:
-            prev_int = max_day
-        days_dd.value = str(min(prev_int, max_day))
+            prev_int = day_max
 
-        self._page.update
+        days_dd.value = str(min(prev_int, day_max))
+
+        day_int = min(prev_int, day_max)
+        days_dd.value = str(day_int)
+
+        self.date_picker.value = dt.datetime(year, month, day_int)
+        self.date_picker.update()
+
+        self._page.update()
 
     @property
     def value(self) -> list:
@@ -208,7 +241,7 @@ class DateRow(ft.Container):
         if not year_val or not month_val:
             days_dd.options = []
             days_dd.value = None
-            self._page.update
+            self._page.update()
             return
 
         try:
@@ -226,7 +259,7 @@ class DateRow(ft.Container):
 
         if day_val is None:
             days_dd.value = None
-            self._page.update
+            self._page.update()
             return
 
         try:
@@ -234,7 +267,7 @@ class DateRow(ft.Container):
             days_dd.value = str(day_int) if 1 <= day_int <= num_days else None
         except ValueError:
             days_dd.value = None
-        self._page.update
+        self._page.update()
 
 
 class StyledSegmentedButton(ft.SegmentedButton):
@@ -291,6 +324,34 @@ class StyledButton(ft.Button):
         self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=6))
 
 
+class StyledIconButton(ft.IconButton):
+    def __init__(
+        self,
+        icon: Optional[IconDataOrControl] = None,
+        tooltip: ft.TooltipValue | None = None,
+        height: Optional[Number] = 36,
+        width: Optional[Number] = 160,
+        expand: bool | int | None = True,
+        on_click: Optional[ControlEventHandler[ft.IconButton]] = None,
+        disabled: bool = False,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            icon=icon,
+            tooltip=tooltip,
+            on_click=on_click,
+            disabled=disabled,
+            height=height,
+            width=width,
+            expand=expand,
+            *args,
+            **kwargs,
+        )
+
+        self.style = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=6))
+
+
 class StyledTextField(ft.TextField):
     def __init__(
         self,
@@ -302,7 +363,7 @@ class StyledTextField(ft.TextField):
         border_radius: Optional[BorderRadiusValue] = 1,
         max_length: Optional[int] = None,
         expand: Optional[bool | int] = None,
-        dense: Optional[bool] = None,
+        dense: Optional[bool] = True,
         icon: Optional[Icon] = None,
         on_change=None,
         *args,
@@ -325,44 +386,102 @@ class StyledTextField(ft.TextField):
         )
 
 
+class StyledDropdown(ft.Dropdown):
+    def __init__(
+        self,
+        value: str | None = None,
+        text: str | None = None,
+        options: list[DropdownOption] | None = None,
+        enable_filter: bool = False,
+        enable_search: bool = True,
+        editable: bool = True,
+        menu_height: Number | None = 10,
+        menu_width: Number | None = None,
+        menu_style: MenuStyle | None = ft.MenuStyle(
+            padding=ft.Padding.all(0),
+            visual_density=ft.VisualDensity.COMPACT,
+        ),
+        input_filter: InputFilter | None = None,
+        trailing_icon: IconDataOrControl | None = None,
+        leading_icon: IconDataOrControl | None = None,
+        on_select: ControlEventHandler[Dropdown] | None = None,
+        on_text_change: ControlEventHandler[Dropdown] | None = None,
+        on_focus: ControlEventHandler[Dropdown] | None = None,
+        label: StrOrControl | None = None,
+        border_width: Number = 1,
+        border_color: ColorValue | None = "#7799b8",
+        border_radius: BorderRadiusValue | None = 1,
+        dense: bool = True,
+        filled: bool = False,
+        helper_text: str | None = None,
+        expand: bool | int | None = True,
+        height: Number | None = 40,
+    ):
+        super().__init__(
+            value=value,
+            text=text,
+            options=options or [],
+            enable_filter=enable_filter,
+            enable_search=enable_search,
+            editable=editable,
+            menu_height=menu_height,
+            menu_width=menu_width,
+            menu_style=menu_style,
+            input_filter=input_filter,
+            trailing_icon=trailing_icon,
+            leading_icon=leading_icon,
+            on_select=on_select,
+            on_text_change=on_text_change,
+            on_focus=on_focus,
+            label=label,
+            border_width=border_width,
+            border_color=border_color,
+            border_radius=border_radius,
+            dense=dense,
+            filled=filled,
+            helper_text=helper_text,
+            expand=expand,
+            height=height,
+        )
+
+
 class WarnPopup(ft.SnackBar):
     def __init__(self, text):
         self.text = text
-        super().__init__(content=self.row())
+        super().__init__(content=self.warn_content(self.text))
 
         self.elevation = 0
-        self.duration = 2500
+        self.duration = 2600
         self.margin = ft.Margin.only(bottom=50)
         self.bgcolor = ft.Colors.TRANSPARENT
         self.behavior = ft.SnackBarBehavior.FLOATING
 
-    def row(self):
-        return ft.Row(
-            alignment=MainAxisAlignment.CENTER,
-            controls=[self.warn_content(self.text)],
-        )
-
     def warn_content(self, text):
         bg_color = "#384759"
-        return ft.Container(
+        container = ft.Container(
             border=ft.Border.all(12, bg_color),
-            border_radius=ft.border_radius.all(9),
+            border_radius=ft.BorderRadius.all(9),
             bgcolor=bg_color,
             content=ft.Text(
+                value=text,
                 color=ft.Colors.WHITE,
                 text_align=ft.TextAlign.CENTER,
-                value=text,
             ),
         )
+        return ft.Row([container], alignment=ft.MainAxisAlignment.CENTER)
 
 
 class StyledAlertDialog(ft.AlertDialog):
     def __init__(
         self,
         shape: Optional[OutlinedBorder] = ft.RoundedRectangleBorder(radius=9),
-        content_padding=ft.Padding.only(left=14, right=14, top=14, bottom=0),
-        actions_padding=ft.Padding.only(left=14, right=14, top=4, bottom=14),
-        action_button_padding: Optional[PaddingValue] = 10,
+        content_padding: Optional[PaddingValue] = ft.Padding.only(
+            left=14, right=14, top=14, bottom=0
+        ),
+        actions_padding: Optional[PaddingValue] = ft.Padding.only(
+            left=14, right=14, top=4, bottom=14
+        ),
+        action_button_padding: Optional[PaddingValue] = ft.Padding.all(10),
         actions_alignment: Optional[MainAxisAlignment] = MainAxisAlignment.CENTER,
         *args,
         **kwargs,
