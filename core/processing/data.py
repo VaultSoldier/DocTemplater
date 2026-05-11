@@ -28,7 +28,7 @@ TABLES = [
     (
         "specialtie_subject_link",
         "/specialtie_subject_link/",
-        ["id", "specialtie_id", "subject_id"],
+        ["specialtie_id", "subject_id"],
     ),
     (
         "chairman_cmk",
@@ -102,9 +102,9 @@ class InitDatabase:
             name TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS specialtie_subject_link (
-            id            INTEGER PRIMARY KEY,
-            specialtie_id INTEGER,
-            subject_id    INTEGER
+            specialtie_id INTEGER NOT NULL,
+            subject_id    INTEGER NOT NULL,
+            PRIMARY KEY (specialtie_id, subject_id)
         );
         CREATE TABLE IF NOT EXISTS chairman_cmk (
             id   INTEGER PRIMARY KEY,
@@ -136,71 +136,82 @@ class InitDatabase:
     def _sync_all(self):
         logging.info("Starting sync...")
 
-        with sqlite3.connect(self.filepath) as conn:
-            cur = conn.cursor()
-            sql = "SELECT api_base FROM settings"
-            row = cur.execute(sql).fetchone()
-            api_base: str | None = row[0] if row else None
+        try:
+            with sqlite3.connect(self.filepath) as conn:
+                cur = conn.cursor()
+                row = cur.execute("SELECT api_base FROM settings").fetchone()
+                api_base: str | None = row[0] if row else None
 
-            if not api_base:
-                self.last_status = AppEvent.API_NO_URL
-                self.page.pubsub.send_all(self.last_status)
-                logging.info("Stopping sync, no API URL...")
-                return
-
-            for table, endpoint, columns in TABLES:
-                try:
-                    self.sync_table(conn, table, api_base, endpoint, columns)
-                except requests.RequestException as e:
-                    self.last_status = AppEvent.API_ERROR
+                if not api_base:
+                    self.last_status = AppEvent.API_NO_URL
                     self.page.pubsub.send_all(self.last_status)
-                    logging.error(f"{table}: API error — {e}")
-                except Exception as e:
-                    self.last_status = AppEvent.API_ERROR
-                    self.page.pubsub.send_all(self.last_status)
-                    logging.error(f"{table}: unexpected error — {e}")
-                    raise  # re-raise to trigger rollback
+                    logging.info("Stopping sync, no API URL...")
+                    return
 
-    def sync_table(
-        self,
-        conn: sqlite3.Connection,
-        table: str,
-        api_base: str,
-        endpoint: str,
-        columns: list[str],
-    ):
+                for table, endpoint, columns in TABLES:
+                    logging.info(f"Syncing table: {table}")
+                    self.sync_table(
+                        conn,
+                        table,
+                        api_base,
+                        endpoint,
+                        columns,
+                    )
+
+            logging.info("Sync completed successfully")
+            self.last_status = AppEvent.API_SYNCED
+            self.page.pubsub.send_all(self.last_status)
+
+        except requests.RequestException as e:
+            logging.exception(f"API error: {e}")
+            self.last_status = AppEvent.API_ERROR
+            self.page.pubsub.send_all(self.last_status)
+
+        except Exception as e:
+            logging.exception(f"Unexpected sync error: {e}")
+            self.last_status = AppEvent.API_ERROR
+            self.page.pubsub.send_all(self.last_status)
+
+    def sync_table(self, conn, table, api_base, endpoint, columns):
         records = self.fetch(api_base, endpoint)
-
         if not records:
             logging.info(f"{table}: no records from API, skipping")
             return
 
-        # Filter out records with null id
-        records = [r for r in records if r.get("id") is not None]
-        remote_ids = {r["id"] for r in records}
+        has_id = "id" in columns
+        remote_ids: set[int] = set()
 
-        # Upsert all remote records
+        if has_id:
+            records = [r for r in records if r.get("id") is not None]
+            remote_ids = {r["id"] for r in records}
+
         col_list = ", ".join(columns)
         placeholders = ", ".join(f":{c}" for c in columns)
-        updates = ", ".join(f"{c} = excluded.{c}" for c in columns if c != "id")
 
-        conn.executemany(
-            f"""
-            INSERT INTO {table} ({col_list})
-            VALUES ({placeholders})
-            ON CONFLICT(id) DO UPDATE SET {updates}
-            """,
-            records,
-        )
-
-        # Delete local rows that no longer exist remotely
-        local_ids = {row[0] for row in conn.execute(f"SELECT id FROM {table}")}
-        deleted_ids = local_ids - remote_ids
-        if deleted_ids:
+        if has_id:
+            updates = ", ".join(f"{c} = excluded.{c}" for c in columns if c != "id")
             conn.executemany(
-                f"DELETE FROM {table} WHERE id = ?", [(i,) for i in deleted_ids]
+                f"""
+                INSERT INTO {table} ({col_list})
+                VALUES ({placeholders})
+                ON CONFLICT(id) DO UPDATE SET {updates}
+                """,
+                records,
             )
-        logging.info(f"{table}: {len(records)} upserted, {len(deleted_ids)} deleted")
+            local_ids = {row[0] for row in conn.execute(f"SELECT id FROM {table}")}
+            deleted_ids = local_ids - remote_ids
+            if deleted_ids:
+                conn.executemany(
+                    f"DELETE FROM {table} WHERE id = ?", [(i,) for i in deleted_ids]
+                )
+        else:
+            conn.execute(f"DELETE FROM {table}")
+            conn.executemany(
+                f"INSERT OR IGNORE INTO {table} ({col_list}) VALUES ({placeholders})",
+                records,
+            )
+
+        logging.info(f"{table}: {len(records)} upserted")
 
     def fetch(self, api_base, endpoint: str) -> list[dict]:
         url = f"{api_base}{endpoint}"
@@ -322,6 +333,41 @@ class SqliteData:
                 LIMIT 1
             """
             return cur.execute(sql, (question_type.value,)).fetchone() is not None
+
+    def read_subjects(self) -> list[tuple[int, str]]:
+        with sqlite3.connect(self.filepath) as conn:
+            return conn.execute(
+                "SELECT id, name FROM subjects ORDER BY name"
+            ).fetchall()
+
+    def read_all_specialties(self) -> list[tuple[int, str]]:
+        with sqlite3.connect(self.filepath) as conn:
+            return conn.execute(
+                "SELECT id, name FROM specialtie ORDER BY name"
+            ).fetchall()
+
+    def read_specialties_by_subject(self, subject_id: int) -> list[tuple[int, str]]:
+        with sqlite3.connect(self.filepath) as conn:
+            return conn.execute(
+                """
+                SELECT s.id, s.name
+                FROM specialtie s
+                JOIN specialtie_subject_link l ON l.specialtie_id = s.id
+                WHERE l.subject_id = ?
+                ORDER BY s.name
+                """,
+                (subject_id,),
+            ).fetchall()
+
+    def read_chairman_cmk(self) -> list[tuple[int, str]]:
+        with sqlite3.connect(self.filepath) as conn:
+            return conn.execute(
+                "SELECT id, name FROM chairman_cmk ORDER BY name"
+            ).fetchall()
+
+    def read_teachers(self) -> list[tuple[int, str]]:
+        with sqlite3.connect(self.filepath) as conn:
+            return conn.execute("SELECT id, name FROM teacher ORDER BY name").fetchall()
 
 
 class TextProcessing:
