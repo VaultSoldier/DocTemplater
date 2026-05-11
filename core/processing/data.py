@@ -3,7 +3,7 @@ import os
 import re
 import sqlite3
 import sys
-from typing import Any, Final
+from typing import Any, Final, List
 
 import flet as ft
 import requests
@@ -65,6 +65,8 @@ class AppSettings:
         with sqlite3.connect(self.filepath) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+            if row is None:
+                raise RuntimeError("Settings not initialised - call _init() first")
             return dict(row)
 
     def save(self, **kwargs):
@@ -86,6 +88,10 @@ class InitDatabase:
             id INTEGER PRIMARY KEY,
             theme_mode TEXT NOT NULL,
             api_base TEXT
+        );
+        CREATE TABLE IF NOT EXISTS sync_etags (
+            endpoint TEXT PRIMARY KEY,
+            etag     TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS questions (
             id INTEGER PRIMARY KEY,
@@ -172,11 +178,20 @@ class InitDatabase:
             self.last_status = AppEvent.API_ERROR
             self.page.pubsub.send_all(self.last_status)
 
-    def sync_table(self, conn, table, api_base, endpoint, columns):
-        records = self.fetch(api_base, endpoint)
-        if not records:
-            logging.info(f"{table}: no records from API, skipping")
+    def sync_table(
+        self,
+        conn: sqlite3.Connection,
+        table: str,
+        api_base: str,
+        endpoint: str,
+        columns: List[str],
+    ):
+        records = self.fetch(conn, api_base, endpoint)
+        if records is None:  # only skip on 304
+            logging.info(f"{table}: not modified, skipping saving")
             return
+        if not records:
+            logging.info(f"{table}: server returned empty list")
 
         has_id = "id" in columns
         remote_ids: set[int] = set()
@@ -213,10 +228,37 @@ class InitDatabase:
 
         logging.info(f"{table}: {len(records)} upserted")
 
-    def fetch(self, api_base, endpoint: str) -> list[dict]:
+    def _save_etag(self, conn, endpoint: str, etag: str):
+        conn.execute(
+            """
+            INSERT INTO sync_etags (endpoint, etag) VALUES (?, ?)
+            ON CONFLICT(endpoint) DO UPDATE SET etag = excluded.etag
+            """,
+            (endpoint, etag),
+        )
+
+    def fetch(
+        self, conn: sqlite3.Connection, api_base: str, endpoint: str
+    ) -> list[dict] | None:
         url = f"{api_base}{endpoint}"
-        resp = requests.get(url, timeout=15)
+
+        # Load ETag from the same DB as the data
+        row = conn.execute(
+            "SELECT etag FROM sync_etags WHERE endpoint = ?", (endpoint,)
+        ).fetchone()
+
+        headers = {"If-None-Match": row[0]} if row else {}
+        resp = requests.get(url, headers=headers, timeout=15)
+
+        if resp.status_code == 304:
+            logging.info(f"{endpoint}: not modified, skipping fetch")
+            return None
+
         resp.raise_for_status()
+
+        if new_etag := resp.headers.get("ETag"):
+            self._save_etag(conn, endpoint, new_etag)  # same transaction as data
+
         return resp.json()
 
     def reset_db(self):
