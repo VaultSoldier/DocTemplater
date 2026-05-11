@@ -36,6 +36,7 @@ class Settings:
                 self.container_api_status.content = ft.Icon(
                     ft.Icons.CLOUD_DONE, color=ft.Colors.LIGHT_GREEN
                 )
+                self.container_api_status.update()
 
     def show(self):
         dialog = StyledAlertDialog(
