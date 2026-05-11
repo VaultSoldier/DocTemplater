@@ -167,14 +167,14 @@ def _build_data_rows(
                                 expand=True,
                             ),
                             StyledIconButton(
-                                ft.Icons.EDIT,
+                                ft.Icon(ft.Icons.EDIT, size=20),
                                 expand=False,
                                 width=40,
                                 on_click=on_edit,
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    )
+                    ),
                 ),
             ],
             data=question_id,
