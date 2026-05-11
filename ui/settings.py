@@ -29,19 +29,18 @@ class Settings:
                 self.container_api_status.update()
             case AppEvent.API_ERROR:
                 self.container_api_status.content = ft.Icon(
-                    ft.Icons.ERROR_OUTLINE,
-                    color=ft.Colors.RED_ACCENT,
+                    ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED_ACCENT
                 )
                 self.container_api_status.update()
-            case AppEvent.API_SUCESS:
+            case AppEvent.API_SYNCED:
                 self.container_api_status.content = ft.Icon(
-                    ft.Icons.DONE_OUTLINE, color=ft.Colors.LIGHT_GREEN
+                    ft.Icons.CLOUD_DONE, color=ft.Colors.LIGHT_GREEN
                 )
 
     def show(self):
         dialog = StyledAlertDialog(
-            modal=True,
             actions_padding=ft.Padding.only(left=14, right=14, top=12, bottom=14),
+            modal=True,
         )
         button_close = StyledButton(
             tooltip="Закрыть",
@@ -55,7 +54,11 @@ class Settings:
         )
 
         def section_data():
-            def debounce_run(api_base):
+            def debounce_run(api_base: str):
+                api_base = "".join(api_base.split())
+                if not api_base.startswith(("http://", "https://")):
+                    api_base = f"https://{api_base}"
+
                 self.app_settings.save(api_base=api_base)
                 self.init_database._sync_all()
 
@@ -90,6 +93,7 @@ class Settings:
             )
 
             def reset_db(e: ft.Event[ft.Button]):
+                textfield_api.value = ""
                 self.init_database.reset_db()
                 self.page.pubsub.send_all(AppEvent.UPDATE_THEME)
                 self.page.pubsub.send_all(AppEvent.DB_RESET)

@@ -32,13 +32,14 @@ class TabEditDocument:
         self.page = page
         self._uploading = False
         self.save_file_path = ""
+        self._subject_id_map: dict[str, int] = {}
         self.page.pubsub.subscribe(self.on_pubsub)
         self.docx_processing = Processing()
         self.sqlite = SqliteData()
 
         self.dropdown_textfield_subject = StyledDropdown(
             label="Предмет",
-            on_select=self.on_change_validate,
+            on_select=self._on_subject_select, 
             on_text_change=self.on_dropdown_change_validate,
         )
 
@@ -148,9 +149,16 @@ class TabEditDocument:
             expand=True, selected=["fallback"]
         )
 
-    def on_pubsub(self, topic):
+        self._populate_static_dropdowns()
+
+    def on_pubsub(self, topic) -> None:
         match topic:
-            case AppEvent.DB_RESET:
+            case AppEvent.DB_RESET | AppEvent.API_SYNCED:
+                self._populate_static_dropdowns()
+                self.dropdown_textfield_spec.options = []
+                self.dropdown_textfield_spec.value = None
+                self.dropdown_textfield_spec.text = ""
+                self.page.update()
                 self.on_change_validate()
             case AppEvent.TABLE_CHANGED:
                 self.on_change_validate()
@@ -185,13 +193,11 @@ class TabEditDocument:
             i.update()
 
     def _textfield_clear(self, e) -> None:
-        # FIX: Dropdown's text don't update it's representation in ui
         for i in self.dropdowns:
             i.value = None
             i.text = ""
-
         self.textfield_ticket_number.value = ""
-
+        self._populate_spec_options(subject_name=None)
         self.page.update()
         self.on_change_validate()
 
@@ -253,6 +259,49 @@ class TabEditDocument:
 
         self.button_create.disabled = not can_enable_button
         self.button_create.update()
+
+    def _populate_static_dropdowns(self) -> None:
+        subjects = self.sqlite.read_subjects()
+        self._subject_id_map = {name: db_id for db_id, name in subjects}
+        self.dropdown_textfield_subject.options = [
+            ft.DropdownOption(key=name, text=name) for _, name in subjects
+        ]
+
+        cmk = self.sqlite.read_chairman_cmk()
+        self.dropdown_textfield_cmk.options = [
+            ft.DropdownOption(key=name, text=name) for _, name in cmk
+        ]
+
+        teachers = self.sqlite.read_teachers()
+        self.dropdown_textfield_tutor.options = [
+            ft.DropdownOption(key=name, text=name) for _, name in teachers
+        ]
+
+        self._populate_spec_options(subject_name=None)
+
+    def _populate_spec_options(self, subject_name: str | None) -> None:
+        """Refill specialty options. Pass None to show all specialties."""
+        subject_db_id = self._subject_id_map.get(subject_name or "")
+
+        if subject_db_id is not None:
+            specialties = self.sqlite.read_specialties_by_subject(subject_db_id)
+        else:
+            specialties = self.sqlite.read_all_specialties()
+
+        self.dropdown_textfield_spec.options = [
+            ft.DropdownOption(key=name, text=name) for _, name in specialties
+        ]
+
+        valid = {name for _, name in specialties}
+        if (self.dropdown_textfield_spec.value or "") not in valid:
+            self.dropdown_textfield_spec.value = None
+            self.dropdown_textfield_spec.text = ""
+
+    def _on_subject_select(self, e=None) -> None:
+        selected_name = (e.control.value if e is not None else None) or ""
+        self._populate_spec_options(subject_name=selected_name or None)
+        self.dropdown_textfield_spec.update()
+        self.on_change_validate()
 
     async def handle_save_file(self) -> str | None:
         text = self.dropdown_textfield_spec.text or ""
@@ -428,10 +477,10 @@ class TabEditDocument:
 
         def get_segment_rnd(question_type: QuestionType) -> ft.Container:
             if question_type == QuestionType.PRACTICAL:
-                label = "Теоретические"
+                label = "Практические"
                 segmented_btn = self.segmented_btn_practical
             else:
-                label = "Практические"
+                label = "Теоретические"
                 segmented_btn = self.segmented_btn_theoretical
 
             segmented_btn.segments = [
