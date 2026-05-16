@@ -136,4 +136,6 @@ class Settings:
         dialog.content = ft.Column(tight=True, controls=[*section_data()])
         dialog.actions = [ft.Row(controls=[button_close])]
         self.page.show_dialog(dialog)
-        self.on_status_change(self.last_status)
+
+        if self.container_api_status.content is None:
+            self.on_status_change(self.last_status)
