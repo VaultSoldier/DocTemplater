@@ -104,12 +104,12 @@ def _batch_worker(
 
         master = Document(buffers[0])
         composer = Composer(master)
-        master.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-        for idx, buf in enumerate(buffers[1:], start=1):
+
+        for buf in buffers[1:]:
+            master.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
             doc = Document(buf)
             composer.append(doc)
-            if idx != len(buffers) - 1:
-                master.add_page_break()
+
         composer.save(output_path)
 
         result_queue.put({"ok": True})
@@ -292,7 +292,12 @@ class Processing:
 
                 batch_files.append(batch_file)
 
-            self.merge_files(batch_files, save_to)
+            self.files_merge(batch_files, save_to)
+
+            threading.Thread(
+                target=self.clean,
+                kwargs={"path": tmp_base_docx_file, "paths": batch_files},
+            ).start()
 
         except DocxProcessingError:
             threading.Thread(
@@ -300,21 +305,6 @@ class Processing:
                 kwargs={"path": tmp_base_docx_file, "paths": batch_files},
             ).start()
             raise
-
-    def merge_files(
-        self, files: list[tempfile._TemporaryFileWrapper], save_to: str
-    ) -> None:
-        """Merge temp files (batches) into final output."""
-        master = Document(files[0].name)
-        composer = Composer(master)
-
-        for idx, f in enumerate(files[1:], start=1):
-            doc = Document(f.name)
-            composer.append(doc)
-            if idx != len(files) - 1:
-                master.add_page_break()
-
-        composer.save(save_to)
 
     def replace_questions(
         self,
@@ -362,19 +352,18 @@ class Processing:
             ).start()
         return buffers_docx
 
-    def docx_merge(self, buffers: list[BytesIO], save_to: str) -> None:
-        """Merge temporary files"""
-        master = Document(buffers[0])
+    def files_merge(
+        self, files: list[tempfile._TemporaryFileWrapper], save_to: str
+    ) -> None:
+        """Merge temp files (batches) into final output."""
+        master = Document(files[0].name)
         composer = Composer(master)
 
-        # master file page break
-        master.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-
-        for idx, buf in enumerate(buffers[1:], start=1):
-            doc = Document(buf)
+        for file in files[1:]:
+            master.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+            doc = Document(file.name)
             composer.append(doc)
-            if idx != len(buffers) - 1:
-                master.add_page_break()
+
         composer.save(save_to)
 
     def clean(
@@ -382,7 +371,9 @@ class Processing:
         path: Optional[tempfile._TemporaryFileWrapper] = None,
         paths: Optional[Iterable[tempfile._TemporaryFileWrapper]] = None,
     ):
+        logging.info("CLEANING. Start")
         if path is None and paths is None:
+            logging.info("CLEANING. Cancel")
             return
 
         all_paths = []
@@ -403,4 +394,6 @@ class Processing:
                 if os.path.exists(file_path):
                     os.remove(file_path)
             except Exception as e:
-                logging.error(f"Failed to delete {file.name}: {e}")
+                logging.error(f"CLEANING. Failed to delete {file.name}: {e}")
+
+        logging.info("CLEANING. Sucessfull")
