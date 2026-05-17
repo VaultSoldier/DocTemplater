@@ -39,7 +39,9 @@ class DocxProcessingCancel(DocxProcessingError):
     pass
 
 
-def get_list_safe(items: list, items_index: int, is_fallback: Optional[bool] = False) -> str:
+def get_list_safe(
+    items: list, items_index: int, is_fallback: Optional[bool] = False
+) -> str:
     if not items:
         return ""
     try:
@@ -56,7 +58,9 @@ def get_question(questions: List[str], status_rnd: str, index_question: int):
 
     match status_rnd:
         case "fallback":
-            return get_list_safe(items=questions, items_index=index_question, is_fallback=True)
+            return get_list_safe(
+                items=questions, items_index=index_question, is_fallback=True
+            )
         case "always":
             return str(random.choice(questions))
         case "none":
@@ -303,7 +307,6 @@ class Processing:
         """Merge temp files (batches) into final output."""
         master = Document(files[0].name)
         composer = Composer(master)
-        master.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
         for idx, f in enumerate(files[1:], start=1):
             doc = Document(f.name)

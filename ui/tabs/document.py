@@ -417,7 +417,7 @@ class TabEditDocument:
         except DocxProcessingError as error:
             remove_overlay()
             self.page.show_dialog(WarnPopup(str(error)))
-            logging.info(f"Error processing docx: {error}'")
+            logging.info(f"Ошибка: {error}'")
             return
 
         self.show_dialog_generation_complete(save_file_path)
