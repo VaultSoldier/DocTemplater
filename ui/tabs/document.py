@@ -39,7 +39,7 @@ class TabEditDocument:
 
         self.dropdown_textfield_subject = StyledDropdown(
             label="Предмет",
-            on_select=self._on_subject_select, 
+            on_select=self._on_subject_select,
             on_text_change=self.on_dropdown_change_validate,
         )
 
@@ -349,12 +349,11 @@ class TabEditDocument:
         if not save_file_path.lower().endswith(".docx"):
             save_file_path = f"{save_file_path}.docx"
 
-        def on_click_button_cancel(e):
-            self.docx_processing.cancel()
-
         text_cancel = ft.Text("Отмена", text_align=ft.TextAlign.CENTER)
         button_cancel = StyledButton(
-            text_cancel, on_click=on_click_button_cancel, expand=False
+            text_cancel,
+            expand=False,
+            on_click=lambda: self.docx_processing.cancel(),
         )
         text_loading = ft.Text(
             "Документ создается...",

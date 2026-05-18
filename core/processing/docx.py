@@ -5,6 +5,7 @@ import sys
 import tempfile
 import threading
 from io import BytesIO
+from multiprocessing import Event as MpEvent
 from multiprocessing import Process, Queue
 from typing import Final, Iterable, List, Optional
 
@@ -79,12 +80,17 @@ def _batch_worker(
     practical_questions: list,
     theoretical_questions: list,
     result_queue: Queue,
+    _cancel_event: threading.Event,
 ):
     try:
         tpl = DocxTemplate(tpl_path)
         buffers = []
 
         for i in batch:
+            if _cancel_event.is_set():
+                result_queue.put({"ok": False, "cancelled": True})
+                return
+
             buf = BytesIO()
 
             context_data = {
@@ -131,14 +137,10 @@ class Processing:
         self.questions_theoretical: list[str] = []
         self.theoretical_questions_count: int = 0
 
-        self._cancel_event = threading.Event()
+        self._cancel_event = MpEvent()
 
     def cancel(self):
         self._cancel_event.set()
-
-    def _check_cancel(self):
-        if self._cancel_event.is_set():
-            raise DocxProcessingCancel("Отмена генерации")
 
     def questions_import(self):
         self.questions_practical: list[str] = self.sql.read_questions_list(
@@ -259,7 +261,9 @@ class Processing:
         batch_files = []
         try:
             for batch_start in range(0, len(tickets), batch_size):
-                self._check_cancel()
+                if self._cancel_event.is_set():
+                    raise DocxProcessingCancel("Отмена генерации")
+
                 batch = range(batch_start, min(batch_start + batch_size, len(tickets)))
 
                 batch_file = tempfile.NamedTemporaryFile(
@@ -281,16 +285,18 @@ class Processing:
                         "practical_questions": self.questions_practical,
                         "theoretical_questions": self.questions_theoretical,
                         "result_queue": result_queue,
+                        "_cancel_event": self._cancel_event,
                     },
                 )
                 process.start()
                 process.join()  # subprocess fully exits here, OS reclaims all lxml memory
 
+                batch_files.append(batch_file)
                 result = result_queue.get()
                 if not result["ok"]:
+                    if result.get("cancelled"):
+                        raise DocxProcessingCancel("Отмена генерации")
                     raise DocxProcessingError(result["error"])
-
-                batch_files.append(batch_file)
 
             self.files_merge(batch_files, save_to)
 
@@ -305,52 +311,6 @@ class Processing:
                 kwargs={"path": tmp_base_docx_file, "paths": batch_files},
             ).start()
             raise
-
-    def replace_questions(
-        self,
-        status_rnd_practical: str,
-        status_rnd_theoretical: str,
-        tickets: range,
-        tpl_template_file: tempfile._TemporaryFileWrapper,
-    ) -> list[BytesIO]:
-        """Replace questions"""
-
-        tpl = DocxTemplate(tpl_template_file.name)
-        buffers_docx = []
-        try:
-            for i in tickets:
-                self._check_cancel()
-                buffer_docx = BytesIO()
-
-                question_theoretical = get_question(
-                    questions=self.questions_theoretical,
-                    status_rnd=status_rnd_theoretical,
-                    index_question=i,
-                )
-                question_practical = get_question(
-                    questions=self.questions_practical,
-                    status_rnd=status_rnd_practical,
-                    index_question=i,
-                )
-                context = {
-                    "ticket_num": f"{i + 1}",
-                    "question_theoretical": question_theoretical,
-                    "question_practical": question_practical,
-                }
-
-                tpl.render(context)
-                tpl.save(buffer_docx)
-                buffer_docx.seek(0)
-                buffers_docx.append(buffer_docx)
-        except DocxProcessingError:
-            for buf in buffers_docx:
-                buf.close()
-            buffers_docx.clear()
-
-            threading.Thread(
-                target=self.clean, kwargs={"path": tpl_template_file}
-            ).start()
-        return buffers_docx
 
     def files_merge(
         self, files: list[tempfile._TemporaryFileWrapper], save_to: str
