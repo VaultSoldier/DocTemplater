@@ -3,7 +3,7 @@ from typing import List
 
 import flet as ft
 
-from core.processing.data import AppSettings
+from core.processing.data import AppSettings, InitDatabase
 from core.types import AppEvent
 from core.ui import load_theme
 from ui.settings import Settings
@@ -63,7 +63,6 @@ class DocTemplater:
         data_app_settings = AppSettings()
         button_theme = ft.IconButton()
 
-
         def switch_theme(e: ft.Event[ft.IconButton]):
             match self.page.theme_mode:
                 case ft.ThemeMode.SYSTEM:
@@ -91,9 +90,7 @@ class DocTemplater:
         )
 
         load_theme(button_theme, self.page, data_app_settings)
-        button_settings = ft.IconButton(
-            ft.Icons.SETTINGS, on_click=app_settings.show
-        )
+        button_settings = ft.IconButton(ft.Icons.SETTINGS, on_click=app_settings.show)
 
         tab_bar = ft.Row(vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=0)
         tab_bar.controls = [
@@ -181,6 +178,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    from core.processing.data import InitDatabase
-
     ft.run(main=main, assets_dir="assets")
