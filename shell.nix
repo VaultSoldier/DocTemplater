@@ -20,6 +20,7 @@ pkgs.mkShell {
     fontconfig
     libepoxy
     dbus
+    mesa-demos
   ];
 
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
