@@ -55,22 +55,29 @@ class Settings:
         )
 
         def section_data():
-            def debounce_run(api_base: str):
-                api_base = "".join(api_base.split())
-                if not api_base.startswith(("http://", "https://")):
-                    api_base = f"https://{api_base}"
-
-                self.app_settings.save(api_base=api_base)
+            def debounce_run(api_base=None, api_username=None, api_password=None):
+                if api_base:
+                    api_base = "".join(api_base.split())
+                    if not api_base.startswith(("http://", "https://")):
+                        api_base = f"https://{api_base}"
+                self.app_settings.save(
+                    api_base=api_base,
+                    api_username=api_username,
+                    api_password=api_password,
+                )
                 self.init_database._sync_all()
 
-            def api_url_save(e: ft.Event[ft.TextField]):
+            def api_save(e: ft.Event[ft.TextField]):
                 if self.debounce_timer is not None:
                     self.debounce_timer.cancel()
-
                 self.container_api_status.content = self.progress_ring
                 self.debounce_timer = threading.Timer(
                     interval=1.5,
-                    function=lambda: debounce_run(api_base=e.control.value),
+                    function=lambda: debounce_run(
+                        api_base=textfield_api.value,
+                        api_username=textfield_api_login.value,
+                        api_password=textfield_api_password.value,
+                    ),
                 )
                 self.debounce_timer.start()
 
@@ -80,8 +87,27 @@ class Settings:
                 hint_text="https://example.com:443",
                 dense=True,
                 expand=True,
-                on_change=api_url_save,
+                on_change=api_save,
             )
+            textfield_api_login = StyledTextField(
+                value=self.app_settings.load().get("api_username"),
+                label="API USERNAME",
+                hint_text="",
+                dense=True,
+                expand=True,
+                on_change=api_save,
+            )
+            textfield_api_password = StyledTextField(
+                value=self.app_settings.load().get("api_password"),
+                label="API PASSWORD",
+                hint_text="",
+                password=True,
+                can_reveal_password=True,
+                dense=True,
+                expand=True,
+                on_change=api_save,
+            )
+
             button_sync = StyledButton(
                 tooltip="Ручная синхронизация",
                 icon=ft.Icons.SYNC,
@@ -124,6 +150,8 @@ class Settings:
                             tight=True,
                             controls=[
                                 ft.Row([textfield_api, self.container_api_status]),
+                                ft.Row([textfield_api_login]),
+                                ft.Row([textfield_api_password]),
                                 ft.Row([button_sync, button_rest_db]),
                             ],
                         ),

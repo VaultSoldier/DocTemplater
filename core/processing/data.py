@@ -9,6 +9,7 @@ import flet as ft
 import requests
 from docx2python import docx2python
 from platformdirs import user_data_dir
+from requests.auth import HTTPBasicAuth
 
 from core.types import AppEvent, OrderType, QuestionType
 
@@ -66,7 +67,7 @@ class AppSettings:
             conn.row_factory = sqlite3.Row
             row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
             if row is None:
-                raise RuntimeError("Settings not initialised - call _init() first")
+                raise RuntimeError("Settings not initialised")
             return dict(row)
 
     def save(self, **kwargs):
@@ -74,8 +75,13 @@ class AppSettings:
         current.update(kwargs)
         with sqlite3.connect(self.filepath) as conn:
             conn.execute(
-                """UPDATE settings SET api_base=?, theme_mode=? WHERE id=1""",
-                (current["api_base"], current["theme_mode"]),
+                """UPDATE settings SET api_base=?, theme_mode=?, api_username=?, api_password=? WHERE id=1""",
+                (
+                    current["api_base"],
+                    current["theme_mode"],
+                    current.get("api_username"),
+                    current.get("api_password"),
+                ),
             )
 
 
@@ -87,7 +93,9 @@ class InitDatabase:
         CREATE TABLE IF NOT EXISTS settings (
             id INTEGER PRIMARY KEY,
             theme_mode TEXT NOT NULL,
-            api_base TEXT
+            api_base TEXT,
+            api_username TEXT,
+            api_password TEXT
         );
         CREATE TABLE IF NOT EXISTS sync_etags (
             endpoint TEXT PRIMARY KEY,
@@ -145,13 +153,20 @@ class InitDatabase:
         try:
             with sqlite3.connect(self.filepath) as conn:
                 cur = conn.cursor()
-                row = cur.execute("SELECT api_base FROM settings").fetchone()
-                api_base: str | None = row[0] if row else None
+                api_auth = self._get_credentials(conn)
+                api_base = cur.execute("SELECT api_base FROM settings").fetchone()
+                api_base: str | None = api_base[0] if api_base else None
 
                 if not api_base:
                     self.last_status = AppEvent.API_NO_URL
                     self.page.pubsub.send_all(self.last_status)
                     logging.info("Stopping sync, no API URL...")
+                    return
+
+                if not api_auth:
+                    self.last_status = AppEvent.API_NO_URL
+                    self.page.pubsub.send_all(self.last_status)
+                    logging.info("Stopping sync, no API CREDENTIALS...")
                     return
 
                 for table, endpoint, columns in TABLES:
@@ -177,6 +192,17 @@ class InitDatabase:
             logging.exception(f"Unexpected sync error: {e}")
             self.last_status = AppEvent.API_ERROR
             self.page.pubsub.send_all(self.last_status)
+
+    def _get_credentials(self, conn: sqlite3.Connection) -> HTTPBasicAuth | None:
+        username = conn.execute("SELECT api_username FROM settings LIMIT 1").fetchone()
+        password = conn.execute("SELECT api_password FROM settings LIMIT 1").fetchone()
+        username = username[0]
+        password = password[0]
+
+        if not username or not password:
+            return None
+        auth = HTTPBasicAuth(username, password)
+        return auth
 
     def sync_table(
         self,
@@ -241,24 +267,22 @@ class InitDatabase:
         self, conn: sqlite3.Connection, api_base: str, endpoint: str
     ) -> list[dict] | None:
         url = f"{api_base}{endpoint}"
-
-        # Load ETag from the same DB as the data
         row = conn.execute(
             "SELECT etag FROM sync_etags WHERE endpoint = ?", (endpoint,)
         ).fetchone()
-
         headers = {"If-None-Match": row[0]} if row else {}
-        resp = requests.get(url, headers=headers, timeout=15)
-
+        resp = requests.get(
+            url,
+            headers=headers,
+            auth=self._get_credentials(conn),
+            timeout=15,
+        )
         if resp.status_code == 304:
             logging.info(f"{endpoint}: not modified, skipping fetch")
             return None
-
         resp.raise_for_status()
-
         if new_etag := resp.headers.get("ETag"):
-            self._save_etag(conn, endpoint, new_etag)  # same transaction as data
-
+            self._save_etag(conn, endpoint, new_etag)
         return resp.json()
 
     def reset_db(self):
